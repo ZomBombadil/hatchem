@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Hatchem! — Hatch Cute Monsters</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; padding:0; }
+  body {
+    font-family: "Comic Sans MS", "Chalkboard SE", "Segoe UI Rounded", "Trebuchet MS", sans-serif;
+    background: linear-gradient(180deg, #aee9ff 0%, #d8f7ff 45%, #fff6d8 100%);
+    color: #4a3728; min-height: 100vh; user-select: none;
+  }
+  #app { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; padding-bottom: 86px; }
+  /* top bar */
+  #topbar {
+    position: sticky; top:0; z-index: 20;
+    display:flex; justify-content:space-between; align-items:center;
+    background: rgba(255,255,255,.92); border-bottom: 3px solid #ffd166;
+    padding: 8px 12px; font-weight: bold; font-size: 18px;
+  }
+  #topbar .pill { background:#fff3c4; border:2px solid #ffd166; border-radius: 999px; padding: 4px 12px; }
+  /* screens */
+  .screen { display:none; padding: 12px 12px 20px; animation: pop .25s ease; }
+  .screen.active { display:block; }
+  @keyframes pop { from { transform: scale(.97); opacity:.4; } to { transform: scale(1); opacity:1; } }
+  h1.logo { text-align:center; font-size: 52px; margin: 18px 0 4px; color:#ff6b6b;
+    text-shadow: 2px 2px 0 #fff, 4px 4px 0 #ffd166; letter-spacing: 1px; }
+  .subtitle { text-align:center; font-size:18px; color:#7a5c3e; margin-bottom: 14px; }
+  .btn {
+    display:block; width:100%; margin: 8px 0; padding: 16px;
+    font-size: 21px; font-weight: bold; font-family: inherit;
+    border: none; border-radius: 18px; cursor: pointer;
+    background: linear-gradient(180deg,#ffd166,#ffb347); color:#5a3b1e;
+    box-shadow: 0 4px 0 #d18f2c; transition: transform .06s;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #d18f2c; }
+  .btn.blue { background: linear-gradient(180deg,#7cc7ff,#4aa8f0); color:#12395c; box-shadow: 0 4px 0 #2f7fc4; }
+  .btn.pink { background: linear-gradient(180deg,#ff9ec7,#ff6fa5); color:#5c1230; box-shadow: 0 4px 0 #c44a78; }
+  .btn.green { background: linear-gradient(180deg,#9df0a8,#5fd977); color:#174d22; box-shadow: 0 4px 0 #3da854; }
+  .btn.purple { background: linear-gradient(180deg,#c9a7ff,#9a6ff0); color:#2c145c; box-shadow: 0 4px 0 #6f4fc4; }
+  .btn.gray { background: linear-gradient(180deg,#e8e8e8,#c9c9c9); color:#555; box-shadow: 0 4px 0 #999; }
+  .btn.small { font-size:16px; padding:10px; }
+  .btn:disabled { filter: grayscale(.8); opacity:.6; }
+  .card { background:#fffdf5; border:3px solid #ffd166; border-radius:18px; padding:12px; margin:10px 0; box-shadow: 0 3px 8px rgba(0,0,0,.08); }
+  .row { display:flex; gap:8px; align-items:center; }
+  .center { text-align:center; }
+  /* rarity colors */
+  .r-common { color:#8a8a8a; } .r-rare { color:#2196f3; } .r-epic { color:#9c27b0; }
+  .r-legendary { color:#f39c12; } .r-mythic { color:#e91e63; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:999px; font-size:13px; font-weight:bold; color:#fff; }
+  .b-common{background:#9e9e9e;} .b-rare{background:#2196f3;} .b-epic{background:#9c27b0;}
+  .b-legendary{background:#f39c12;} .b-mythic{background:linear-gradient(90deg,#e91e63,#9c27b0);}
+  .elem { display:inline-block; padding:2px 10px; border-radius:999px; font-size:13px; font-weight:bold; background:#eee; }
+  .e-snack{background:#ffe0b2;color:#8a4b00;} .e-spice{background:#ffcdd2;color:#a31212;}
+  .e-frost{background:#d6f2ff;color:#0b5f8a;} .e-volt{background:#fff9c4;color:#8a7400;}
+  .e-splash{background:#cdeffd;color:#0b5f8a;} .e-cosmic{background:#e6d4ff;color:#4b1d8a;}
+  /* hp bars */
+  .hpbar { height:16px; background:#e0d6c8; border-radius:999px; overflow:hidden; border:2px solid #b8a88f; }
+  .hpfill { height:100%; border-radius:999px; background:linear-gradient(90deg,#7bed7b,#2fbf4f); transition: width .4s; }
+  .hpfill.low { background:linear-gradient(90deg,#ff9a8a,#e0392b); }
+  .xpbar { height:10px; background:#e0d6c8; border-radius:999px; overflow:hidden; margin-top:4px;}
+  .xpfill { height:100%; background:linear-gradient(90deg,#9adcff,#3f9df0); transition: width .4s; }
+  /* grids */
+  .grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; }
+  .slot { background:#fffdf5; border:3px solid #ffd166; border-radius:16px; padding:6px; text-align:center; cursor:pointer; min-height:120px; }
+  .slot.sel { border-color:#ff6b6b; box-shadow:0 0 0 3px #ff6b6b55; }
+  .slot canvas { width:100%; height:auto; }
+  .slot .nm { font-size:13px; font-weight:bold; }
+  /* navbar */
+  #navbar { position:fixed; bottom:0; left:0; right:0; z-index:30; background:#fffdf5;
+    border-top:3px solid #ffd166; display:flex; max-width:480px; margin:0 auto; }
+  #navbar button { flex:1; border:none; background:none; font-family:inherit; font-size:12px; font-weight:bold;
+    padding:10px 2px 12px; color:#7a5c3e; cursor:pointer; }
+  #navbar button .ico { font-size:24px; display:block; }
+  #navbar button.on { color:#ff6b6b; }
+  /* overlay */
+  #overlay { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center;
+    background:rgba(40,25,60,.72); padding:16px; }
+  #overlay.show { display:flex; }
+  #overlay .panel { background:#fffdf5; border:4px solid #ffd166; border-radius:22px; padding:18px; max-width:420px; width:100%;
+    text-align:center; max-height:92vh; overflow:auto; }
+  #overlay canvas.stage { width:100%; max-width:340px; height:auto; }
+  .shake { animation: shake .5s infinite; }
+  @keyframes shake { 0%,100%{transform:translateX(0) rotate(0);} 25%{transform:translateX(-7px) rotate(-6deg);} 75%{transform:translateX(7px) rotate(6deg);} }
+  .reveal-flash { animation: flash .8s ease; }
+  @keyframes flash { 0%{filter:brightness(3);} 100%{filter:brightness(1);} }
+  #blog { background:#fffdf5; border:3px solid #ffd166; border-radius:14px; padding:8px 10px; min-height:64px;
+    font-size:15px; margin:8px 0; text-align:left; }
+  .movebtn .tag { font-size:12px; opacity:.75; }
+  .hidden { display:none !important; }
+  .big-egg { font-size: 90px; }
+  .timer { font-size:14px; color:#7a5c3e; }
+  .dexpct { font-size:16px; font-weight:bold; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <span class="pill">🪙 <span id="tb-coins">0</span></span>
+    <span class="pill">🥚 <span id="tb-eggs">0</span> <span class="timer" id="tb-eggtimer"></span></span>
+    <span class="pill">📖 <span id="tb-dex">0%</span></span>
+  </div>
+
+  <!-- TITLE -->
+  <section class="screen" id="scr-title">
+    <h1 class="logo">Hatchem!</h1>
+    <div class="subtitle">Hatch eggs. Meet monsters.<br>Become the greatest Hatcher ever!</div>
+    <div class="center"><div class="big-egg">🥚</div></div>
+    <button class="btn pink" id="btn-start">▶ Tap to Start!</button>
+    <div class="center timer">A wholesome game for the whole family 💛<br>v1.1 — works fully offline</div>
+    <div class="card center" style="margin-top:14px">
+      <button class="btn small gray" id="btn-mute-title">🔊 Sound: On</button>
+    </div>
+  </section>
+
+  <!-- HOME -->
+  <section class="screen" id="scr-home">
+    <h1 class="logo" style="font-size:38px">Hatchem!</h1>
+    <div class="card center">
+      <div style="font-size:15px">Your buddy team</div>
+      <div class="row" id="home-team" style="justify-content:center"></div>
+    </div>
+    <button class="btn" id="btn-go-eggs">🥚 Hatch Eggs <span id="home-eggct"></span></button>
+    <button class="btn blue" id="btn-go-battle">⚔️ Battle!</button>
+    <button class="btn purple" id="btn-go-dex">📖 Hatchidex</button>
+    <button class="btn green" id="btn-go-team">🐾 My Team</button>
+    <button class="btn pink" id="btn-go-shop">🛍️ Card Shop</button>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <span>🎁 Free egg timer</span><span class="timer" id="home-timer"></span>
+      </div>
+      <div style="font-size:13px;color:#7a5c3e">Win battles for bonus eggs &amp; coins!</div>
+    </div>
+    <button class="btn small gray" id="btn-go-settings">⚙️ Settings</button>
+  </section>
+
+  <!-- EGGS -->
+  <section class="screen" id="scr-eggs">
+    <h2 class="center">🥚 Your Eggs</h2>
+    <div class="subtitle">Tap an egg to hatch it!</div>
+    <div class="grid" id="egg-grid"></div>
+    <div class="card center" id="egg-empty" style="display:none">No eggs right now!<br>Win battles or wait for the free egg timer. ⏳</div>
+    <div class="card"><b>How hatching works:</b><br>
+      🥚 Every 10th hatch without an Epic (or better) is <b>guaranteed Epic+</b>!<br>
+      ✨ Your very first hatch is extra lucky…
+    </div>
+  </section>
+
+  <!-- DEX -->
+  <section class="screen" id="scr-dex">
+    <h2 class="center">📖 Hatchidex</h2>
+    <div class="center dexpct" id="dex-pct"></div>
+    <div class="grid" id="dex-grid"></div>
+    <div id="dex-detail"></div>
+  </section>
+
+  <!-- TEAM -->
+  <section class="screen" id="scr-team">
+    <h2 class="center">🐾 My Team</h2>
+    <div class="subtitle">Tap monsters to put them in your battle team (3 max).</div>
+    <h3>⭐ Battle Team</h3>
+    <div class="grid" id="team-slots"></div>
+    <h3>🎒 Collection (<span id="team-count"></span>)</h3>
+    <div class="grid" id="team-grid"></div>
+  </section>
+
+  <!-- BATTLE MENU -->
+  <section class="screen" id="scr-battlet">
+    <h2 class="center">⚔️ Battle!</h2>
+    <button class="btn green" id="btn-wild">🌿 Wild Battle <span style="font-size:14px">(practice!)</span></button>
+    <div class="card"><b>🏆 Trainer Ladder</b><div id="camp-list"></div></div>
+    <div class="card" style="font-size:14px">💡 Tip: <span class="e-snack elem">Snack</span> beats <span class="e-splash elem">Splash</span> beats <span class="e-frost elem">Frost</span> beats <span class="e-spice elem">Spice</span> beats <span class="e-volt elem">Volt</span> beats <span class="e-cosmic elem">Cosmic</span> beats <span class="e-snack elem">Snack</span>!</div>
+  </section>
+
+  <!-- BATTLE -->
+  <section class="screen" id="scr-battle">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div><b id="b-ename"></b> <span id="b-elvl"></span> <span id="b-eelem"></span></div>
+        <div id="b-eballs"></div>
+      </div>
+      <div class="row"><canvas id="b-ecanv" width="160" height="160" style="width:110px;height:110px"></canvas>
+        <div style="flex:1"><div class="hpbar"><div class="hpfill" id="b-ehp"></div></div><div id="b-ehpnum" style="font-size:13px"></div></div>
+      </div>
+    </div>
+    <div id="blog">A wild battle begins!</div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div><b id="b-pname"></b> <span id="b-plvl"></span> <span id="b-pelem"></span></div>
+        <div id="b-pballs"></div>
+      </div>
+      <div class="row"><canvas id="b-pcanv" width="160" height="160" style="width:110px;height:110px"></canvas>
+        <div style="flex:1"><div class="hpbar"><div class="hpfill" id="b-php"></div></div><div id="b-phpnum" style="font-size:13px"></div>
+        <div class="xpbar"><div class="xpfill" id="b-pxp"></div></div></div>
+      </div>
+    </div>
+    <div id="b-controls">
+      <button class="btn movebtn" id="b-m1"></button>
+      <button class="btn movebtn blue" id="b-m2"></button>
+      <div class="row"><button class="btn small green" id="b-switch" style="flex:1">🔄 Switch</button>
+      <button class="btn small gray" id="b-run" style="flex:1">🏃 Run</button></div>
+    </div>
+    <div id="b-switchlist" class="hidden"></div>
+  </section>
+
+  <!-- SHOP -->
+  <section class="screen" id="scr-shop">
+    <h2 class="center">🛍️ Card Shop</h2>
+    <div class="card center">
+      <div style="font-size:44px">🃏</div>
+      <b>Monster Booster Pack</b><br>3 mystery monsters!
+      <div style="font-size:13px;color:#7a5c3e">Same hatch odds. Own lucky counter.</div>
+      <button class="btn pink" id="btn-buypack">Buy for 🪙150</button>
+      <div class="timer">You have 🪙<span id="shop-coins"></span></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="screen" id="scr-settings">
+    <h2 class="center">⚙️ Settings</h2>
+    <button class="btn small" id="btn-mute">🔊 Sound: On</button>
+    <div class="card center" style="font-size:14px">
+      Made with 💛 for families.<br>All monsters are 100% original &amp; silly.<br>No ads. No purchases. Just hatching!
+    </div>
+    <button class="btn small gray" id="btn-newgame">🗑️ Start Over (erases everything)</button>
+  </section>
+
+  <nav id="navbar">
+    <button data-scr="scr-home">🏠<span class="ico"></span>Home</button>
+    <button data-scr="scr-eggs">🥚<span class="ico"></span>Eggs</button>
+    <button data-scr="scr-battlet">⚔️<span class="ico"></span>Battle</button>
+    <button data-scr="scr-dex">📖<span class="ico"></span>Dex</button>
+    <button data-scr="scr-team">🐾<span class="ico"></span>Team</button>
+    <button data-scr="scr-shop">🛍️<span class="ico"></span>Shop</button>
+  </nav>
+
+  <div id="overlay"><div class="panel" id="overlay-panel"></div></div>
+</div>
+<script>
+"use strict";
+/* ================= Hatchem! v1.1 — a wholesome monster hatching game ================ */
+const $ = id => document.getElementById(id);
+const rnd = (a,b) => a + Math.random()*(b-a);
+const ri = (a,b) => Math.floor(rnd(a,b+1));
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+
+/* ================= AUDIO (tiny WebAudio synth) ================= */
+let AC = null;
+function audio() { if (!AC) { try { AC = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} } return AC; }
+function tone(f, d=0.12, type="sine", vol=0.18, when=0) {
+  if (S.settings.mute) return;
+  const ac = audio(); if (!ac) return;
+  const t = ac.currentTime + when;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t+d);
+  o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+d+0.02);
+}
+const sfx = {
+  tap(){ tone(520, .07, "triangle"); },
+  hatch_crack(){ tone(180,.1,"sawtooth",.2); tone(120,.15,"sawtooth",.2,.08); tone(90,.2,"sawtooth",.25,.16); },
+  fanfare(){ [523,659,784,1047].forEach((f,i)=>tone(f,.16,"triangle",.2,i*.12)); },
+  rare(){ [392,523,659,784,1047,1319].forEach((f,i)=>tone(f,.18,"sine",.2,i*.1)); },
+  evolve(){ [300,400,500,650,800,1000,1300].forEach((f,i)=>tone(f,.14,"square",.1,i*.09)); },
+  hit(){ tone(200,.12,"sawtooth",.22); tone(140,.1,"square",.15,.05); },
+  superhit(){ tone(300,.1,"sawtooth",.25); tone(500,.14,"sawtooth",.25,.08); tone(700,.18,"sawtooth",.25,.16); },
+  weak(){ tone(250,.15,"sine",.15); },
+  heal(){ [440,554,659].forEach((f,i)=>tone(f,.14,"sine",.16,i*.09)); },
+  coin(){ tone(880,.08,"square",.14); tone(1320,.12,"square",.14,.07); },
+  win(){ [523,659,784,1047,784,1047].forEach((f,i)=>tone(f,.15,"triangle",.2,i*.11)); },
+  lose(){ [400,350,300,240].forEach((f,i)=>tone(f,.18,"sine",.18,i*.14)); },
+  pop(){ tone(700,.06,"sine",.16); },
+};
+
+/* ================= ELEMENTS ================= */
+/* cycle: snack>splash>frost>spice>volt>cosmic>snack */
+const ELEMENTS = ["snack","splash","frost","spice","volt","cosmic"];
+const ELEMOJI = { snack:"🍪", spice:"🌶️", frost:"❄️", volt:"⚡", splash:"💧", cosmic:"🌌" };
+const ELEMV = { snack:"Snack Attack", splash:"Splash Plop", frost:"Frosty Nibble", spice:"Spicy Sizzle", volt:"Volt Zap", cosmic:"Cosmic Crunch" };
+function matchup(atk, def) {
+  if (!atk || !def) return 1;
+  const i = ELEMENTS.indexOf(atk), j = ELEMENTS.indexOf(def);
+  if (i < 0 || j < 0) return 1;
+  if ((i+1) % 6 === j) return 1.5;
+  if ((j+1) % 6 === i) return 0.7;
+  return 1;
+}
+function matchText(m) { return m > 1 ? "Super tasty! ✨" : m < 1 ? "Not very tasty…" : ""; }
+
+/* ================= SPECIES (100% original!) ================= */
+/* art: {body, c1, c2, accent, extra, eyes, mouth} */
+const SPECIES = [
+ // --- COMMONS ---
+ {id:"crumblet", name:"Crumblet", rarity:"common", element:"snack", dex:1,
+  desc:"A happy little crumb that dreams of becoming toast.",
+  base:{hp:42,atk:11,def:10,spd:11}, evo:{to:"toasturtle",at:12},
+  art:{body:"round",c1:"#e8b06a",c2:"#f7ddad",accent:"#a06a2c",extra:"crumbs",eyes:"happy",mouth:"smile"}},
+ {id:"toasturtle", name:"Toasturtle", rarity:"common", element:"snack", dex:2,
+  desc:"Slow, warm, and butters both sides.",
+  base:{hp:58,atk:14,def:15,spd:9}, evo:{to:"bagelodon",at:26},
+  art:{body:"long",c1:"#d99a4e",c2:"#f2cf8e",accent:"#7c4f1d",extra:"shell",eyes:"calm",mouth:"smile"}},
+ {id:"bagelodon", name:"Bagelodon", rarity:"common", element:"snack", dex:3,
+  desc:"A prehistoric bagel with a hole lot of heart.",
+  base:{hp:78,atk:18,def:20,spd:10}, evo:null,
+  art:{body:"round",c1:"#c9853f",c2:"#eec27f",accent:"#5e3a12",extra:"hole",eyes:"proud",mouth:"grin"}},
+ {id:"driplet", name:"Driplet", rarity:"common", element:"frost", dex:4,
+  desc:"A tiny droplet that shivers with joy.",
+  base:{hp:40,atk:12,def:9,spd:14}, evo:{to:"gelatopus",at:12},
+  art:{body:"pear",c1:"#aee3ff",c2:"#e8f9ff",accent:"#3f8fb5",extra:"drip",eyes:"happy",mouth:"smile"}},
+ {id:"gelatopus", name:"Gelatopus", rarity:"common", element:"frost", dex:5,
+  desc:"Eight scoops of hugs.",
+  base:{hp:56,atk:15,def:13,spd:13}, evo:{to:"gelamammoth",at:26},
+  art:{body:"round",c1:"#f6c9e0",c2:"#fdeef7",accent:"#b5658f",extra:"tenticles",eyes:"happy",mouth:"open"}},
+ {id:"gelamammoth", name:"Gelamammoth", rarity:"common", element:"frost", dex:6,
+  desc:"The coolest mammoth of the ice-cream age.",
+  base:{hp:80,atk:17,def:21,spd:9}, evo:null,
+  art:{body:"long",c1:"#cfe9ff",c2:"#ffffff",accent:"#5b8fc4",extra:"tusks",eyes:"calm",mouth:"smile"}},
+ // --- RARES ---
+ {id:"pepperpup", name:"Pepperpup", rarity:"rare", element:"spice", dex:7,
+  desc:"A spicy pup whose bark has a little bite.",
+  base:{hp:52,atk:16,def:12,spd:15}, evo:{to:"jalapenaur",at:14},
+  art:{body:"round",c1:"#e2574c",c2:"#ffb3a0",accent:"#7e1f14",extra:"stem",eyes:"happy",mouth:"open"}},
+ {id:"jalapenaur", name:"Jalapenaur", rarity:"rare", element:"spice", dex:8,
+  desc:"Roars with the heat of a summer fiesta.",
+  base:{hp:68,atk:20,def:16,spd:16}, evo:{to:"infermuffin",at:28},
+  art:{body:"long",c1:"#3f9e4d",c2:"#b8e6a0",accent:"#1d5c26",extra:"spikes",eyes:"proud",mouth:"grin"}},
+ {id:"infermuffin", name:"Infermuffin", rarity:"rare", element:"spice", dex:9,
+  desc:"Fresh from the oven of a volcano.",
+  base:{hp:88,atk:25,def:20,spd:17}, evo:null,
+  art:{body:"round",c1:"#c65b21",c2:"#ffd9a0",accent:"#5e2408",extra:"flame",eyes:"proud",mouth:"grin"}},
+ {id:"wattlet", name:"Wattlet", rarity:"rare", element:"volt", dex:10,
+  desc:"A tiny spark that giggles when it zaps.",
+  base:{hp:48,atk:15,def:11,spd:19}, evo:{to:"espressaur",at:14},
+  art:{body:"pear",c1:"#ffe066",c2:"#fff9d6",accent:"#a38600",extra:"bolt",eyes:"happy",mouth:"open"}},
+ {id:"espressaur", name:"Espressaur", rarity:"rare", element:"volt", dex:11,
+  desc:"Runs on pure espresso. Never sleeps. Ever.",
+  base:{hp:64,atk:21,def:14,spd:22}, evo:{to:"cappucinator",at:28},
+  art:{body:"long",c1:"#6f4a2f",c2:"#c9a06a",accent:"#2e1a0c",extra:"steam",eyes:"dizzy",mouth:"grin"}},
+ {id:"cappucinator", name:"Cappucinator", rarity:"rare", element:"volt", dex:12,
+  desc:"Foamy, frothy, and fully charged.",
+  base:{hp:84,atk:26,def:18,spd:24}, evo:null,
+  art:{body:"round",c1:"#f3e5c8",c2:"#ffffff",accent:"#7c5a2e",extra:"foam",eyes:"proud",mouth:"smile"}},
+ // --- EPICS ---
+ {id:"starberry", name:"Starberry", rarity:"epic", element:"cosmic", dex:13,
+  desc:"A berry that fell from a shooting star.",
+  base:{hp:62,atk:20,def:16,spd:18}, evo:{to:"moonmacaron",at:16},
+  art:{body:"round",c1:"#b388ff",c2:"#e8dbff",accent:"#4b2a86",extra:"starleaf",eyes:"happy",mouth:"smile"}},
+ {id:"moonmacaron", name:"Moonmacaron", rarity:"epic", element:"cosmic", dex:14,
+  desc:"Baked in moonlight, filled with stardust.",
+  base:{hp:78,atk:24,def:21,spd:19}, evo:{to:"nebulonut",at:30},
+  art:{body:"long",c1:"#8e7cc3",c2:"#d9ccff",accent:"#372a63",extra:"crescent",eyes:"calm",mouth:"smile"}},
+ {id:"nebulonut", name:"Nebulonut", rarity:"epic", element:"cosmic", dex:15,
+  desc:"A donut swirling with entire galaxies.",
+  base:{hp:100,atk:29,def:26,spd:20}, evo:null,
+  art:{body:"round",c1:"#5e35b1",c2:"#b39ddb",accent:"#1e0f45",extra:"hole",eyes:"proud",mouth:"grin"}},
+ {id:"teacuppy", name:"Teacuppy", rarity:"epic", element:"splash", dex:16,
+  desc:"A puppy in a teacup. Handle with care.",
+  base:{hp:64,atk:19,def:18,spd:17}, evo:{to:"tiramisnake",at:16},
+  art:{body:"round",c1:"#9fd8ef",c2:"#eefbff",accent:"#2f6d8a",extra:"cup",eyes:"happy",mouth:"open"}},
+ {id:"tiramisnake", name:"Tiramisnake", rarity:"epic", element:"splash", dex:17,
+  desc:"Slippery, creamy, and surprisingly friendly.",
+  base:{hp:80,atk:23,def:22,spd:21}, evo:{to:"geyserito",at:30},
+  art:{body:"long",c1:"#d9b38c",c2:"#f7e8d0",accent:"#6e4520",extra:"cocoa",eyes:"calm",mouth:"smile"}},
+ {id:"geyserito", name:"Geyserito", rarity:"epic", element:"splash", dex:18,
+  desc:"A burrito that erupts with flavor.",
+  base:{hp:102,atk:28,def:27,spd:22}, evo:null,
+  art:{body:"long",c1:"#e8a25e",c2:"#ffe3b3",accent:"#7e4416",extra:"geyser",eyes:"proud",mouth:"grin"}},
+ // --- LEGENDARY ---
+ {id:"chocolot", name:"Chocolot", rarity:"legendary", element:"spice", dex:19,
+  desc:"An ocelot made of the world's finest chocolate.",
+  base:{hp:86,atk:28,def:22,spd:24}, evo:{to:"smoragon",at:20},
+  art:{body:"long",c1:"#5a3220",c2:"#a9744f",accent:"#1e0f06",extra:"spots",eyes:"proud",mouth:"grin"}},
+ {id:"smoragon", name:"S'moragon", rarity:"legendary", element:"spice", dex:20,
+  desc:"A dragon forged in campfire stories.",
+  base:{hp:120,atk:36,def:30,spd:26}, evo:null,
+  art:{body:"long",c1:"#7a4a21",c2:"#e8c98f",accent:"#2e1a08",extra:"wings",eyes:"proud",mouth:"grin"}},
+ // --- MYTHIC ---
+ {id:"croissaclysm", name:"Croissaclysm", rarity:"mythic", element:"cosmic", dex:21,
+  desc:"The legendary flaky one. Breakfast will never be the same.",
+  base:{hp:140,atk:42,def:34,spd:32}, evo:null,
+  art:{body:"blob",c1:"#f0b95e",c2:"#ffe9bd",accent:"#8a5a1a",extra:"flakes",eyes:"proud",mouth:"grin"}},
+];
+const SP_BY_ID = {}; SPECIES.forEach(s => SP_BY_ID[s.id] = s);
+const RARITY_ODDS = { common:60, rare:25, epic:10, legendary:4, mythic:1 };
+const RARITY_ORDER = ["common","rare","epic","legendary","mythic"];
+
+/* ================= TRAINERS ================= */
+const TRAINERS = [
+ {name:"Sunny the Snack Scout", title:"Tutorial Trainer", team:[["crumblet",3],["driplet",4]], reward:{coins:50,egg:1}, first:{coins:100}},
+ {name:"Peppy the Picnic Pal", title:"Park Pal", team:[["toasturtle",6],["pepperpup",7],["wattlet",6]], reward:{coins:70,egg:1}, first:{coins:120}},
+ {name:"Captain Brine", title:"Splash Sailor", team:[["teacuppy",11],["gelatopus",12],["pepperpup",11]], reward:{coins:90,egg:1}, first:{coins:150}},
+ {name:"Madame Frostine", title:"Frost Fan", team:[["gelamammoth",16],["tiramisnake",16],["jalapenaur",17]], reward:{coins:120,egg:2}, first:{coins:200}},
+ {name:"Baron Von Volt", title:"Volt Villain (but nice)", team:[["espressaur",22],["moonmacaron",23],["infermuffin",23]], reward:{coins:160,egg:2}, first:{coins:260}},
+ {name:"The Mythic Chef", title:"Final Boss… of Breakfast", team:[["smoragon",30],["nebulonut",31],["geyserito",30]], reward:{coins:250,egg:3}, first:{coins:400}},
+];
+
+/* ================= PROCEDURAL MONSTER ART ================= */
+function star(ctx, x, y, r, color) {
+  ctx.save(); ctx.fillStyle = color; ctx.beginPath();
+  for (let i=0;i<8;i++){ const a=i*Math.PI/4, rr=i%2?r*0.4:r;
+    ctx[i?"lineTo":"moveTo"](x+Math.cos(a)*rr, y+Math.sin(a)*rr); }
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function drawEggShape(ctx, cx, cy, s, crack) {
+  // s = half-height
+  ctx.save();
+  ctx.fillStyle = "#fff6e8"; ctx.strokeStyle = "#d9a75f"; ctx.lineWidth = s*0.08;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy-s);
+  ctx.bezierCurveTo(cx+s*0.75, cy-s, cx+s*0.62, cy+s*0.75, cx, cy+s*0.75);
+  ctx.bezierCurveTo(cx-s*0.62, cy+s*0.75, cx-s*0.75, cy-s, cx, cy-s);
+  ctx.fill(); ctx.stroke();
+  // spots
+  ctx.fillStyle = "#ffc9d6";
+  [[-0.3,-0.1],[0.32,0.05],[-0.05,0.4],[0.15,-0.35]].forEach(p=>{
+    ctx.beginPath(); ctx.arc(cx+p[0]*s, cy+p[1]*s, s*0.11, 0, 7); ctx.fill(); });
+  // cracks
+  if (crack > 0) {
+    ctx.strokeStyle = "#8a6a3a"; ctx.lineWidth = s*0.05; ctx.beginPath();
+    ctx.moveTo(cx-s*0.3, cy-s*0.5); ctx.lineTo(cx-s*0.05, cy-s*0.1); ctx.lineTo(cx-s*0.25, cy+s*0.2);
+    if (crack > 1) { ctx.moveTo(cx-s*0.05, cy-s*0.1); ctx.lineTo(cx+s*0.25, cy-s*0.05); ctx.lineTo(cx+s*0.1, cy+s*0.3); }
+    if (crack > 2) { ctx.moveTo(cx+s*0.25, cy-s*0.05); ctx.lineTo(cx+s*0.42, cy+s*0.25); }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawMonster(ctx, sp, cx, cy, size, opts={}) {
+  const a = sp.art, r = size;
+  ctx.save();
+  // rarity aura behind
+  if (sp.rarity === "legendary" || sp.rarity === "mythic") {
+    const g = ctx.createRadialGradient(cx,cy,r*0.5,cx,cy,r*2.1);
+    const col = sp.rarity === "mythic" ? "255,120,200" : "255,200,80";
+    g.addColorStop(0, `rgba(${col},0.55)`); g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx,cy,r*2.1,0,7); ctx.fill();
+  }
+  // tail behind (for long bodies)
+  if (a.extra === "tenticles") {
+    ctx.strokeStyle = a.c1; ctx.lineWidth = r*0.16; ctx.lineCap = "round";
+    for (let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(cx+i*r*0.28, cy+r*0.75);
+      ctx.quadraticCurveTo(cx+i*r*0.36, cy+r*1.25, cx+i*r*0.2, cy+r*1.45); ctx.stroke(); }
+  }
+  if (a.extra === "wings") {
+    ctx.fillStyle = a.c2; ctx.strokeStyle = a.accent; ctx.lineWidth = r*0.05;
+    [-1,1].forEach(s=>{
+      ctx.beginPath(); ctx.moveTo(cx+s*r*0.7, cy-r*0.1);
+      ctx.quadraticCurveTo(cx+s*r*1.7, cy-r*0.9, cx+s*r*1.5, cy+r*0.2);
+      ctx.quadraticCurveTo(cx+s*r*1.1, cy+r*0.35, cx+s*r*0.7, cy+r*0.25);
+      ctx.closePath(); ctx.fill(); ctx.stroke(); });
+  }
+  // body
+  ctx.fillStyle = a.c1; ctx.strokeStyle = a.accent; ctx.lineWidth = r*0.07;
+  ctx.beginPath();
+  if (a.body === "round") ctx.arc(cx, cy, r, 0, 7);
+  else if (a.body === "pear") { ctx.ellipse(cx, cy+r*0.1, r*0.85, r*1.05, 0, 0, 7); }
+  else if (a.body === "long") { ctx.ellipse(cx, cy, r*1.25, r*0.85, 0, 0, 7); }
+  else { // blob: bumpy
+    for (let i=0;i<=12;i++){ const th=i/12*Math.PI*2, rr=r*(1+0.1*Math.sin(th*3));
+      const px=cx+Math.cos(th)*rr, py=cy+Math.sin(th)*rr;
+      i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+    ctx.closePath();
+  }
+  ctx.fill(); ctx.stroke();
+  // belly
+  ctx.fillStyle = a.c2;
+  ctx.beginPath();
+  if (a.body === "long") ctx.ellipse(cx, cy+r*0.35, r*0.7, r*0.42, 0, 0, 7);
+  else ctx.ellipse(cx, cy+r*0.45, r*0.55, r*0.42, 0, 0, 7);
+  ctx.fill();
+  // donut hole
+  if (a.extra === "hole") {
+    ctx.fillStyle = "#fffdf5"; ctx.beginPath(); ctx.arc(cx, cy-r*0.25, r*0.28, 0, 7); ctx.fill();
+    ctx.strokeStyle = a.accent; ctx.lineWidth = r*0.06; ctx.stroke();
+  }
+  // back extras
+  ctx.fillStyle = a.accent;
+  if (a.extra === "spikes") for (let i=-2;i<=2;i++){
+    const bx = a.body==="long"? cx+i*r*0.4 : cx+i*r*0.32, by = cy-r*0.75;
+    ctx.beginPath(); ctx.moveTo(bx-r*0.14,by); ctx.lineTo(bx,by-r*0.35); ctx.lineTo(bx+r*0.14,by); ctx.closePath(); ctx.fill(); }
+  if (a.extra === "spots") { ctx.fillStyle = a.accent;
+    [[-0.4,-0.5],[0.35,-0.55],[0,-0.75],[-0.15,-0.35]].forEach(p=>{ ctx.beginPath(); ctx.arc(cx+p[0]*r, cy+p[1]*r, r*0.12,0,7); ctx.fill(); }); }
+  if (a.extra === "crumbs") { ctx.fillStyle = a.accent;
+    for (let i=0;i<7;i++){ const th=rnd(0,6.28); ctx.beginPath(); ctx.arc(cx+Math.cos(th)*r*1.35, cy+Math.sin(th)*r*1.35, r*0.07,0,7); ctx.fill(); } }
+  if (a.extra === "cocoa") { ctx.fillStyle = a.accent;
+    for (let i=0;i<10;i++){ ctx.beginPath(); ctx.arc(cx+rnd(-0.8,0.8)*r, cy+rnd(-0.9,-0.2)*r, r*0.05,0,7); ctx.fill(); } }
+  // head-top extras
+  const tx = cx, ty = cy - r*(a.body==="long"?0.8:0.95);
+  if (a.extra === "stem") { ctx.strokeStyle="#2f7d32"; ctx.lineWidth=r*0.12; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(tx,ty+r*0.15); ctx.quadraticCurveTo(tx+r*0.1,ty-r*0.25,tx+r*0.3,ty-r*0.3); ctx.stroke();
+    ctx.fillStyle="#3f9e4d"; ctx.beginPath(); ctx.ellipse(tx+r*0.38,ty-r*0.3,r*0.22,r*0.12,0.5,0,7); ctx.fill(); }
+  if (a.extra === "flame") { ctx.fillStyle="#ff9d2e";
+    ctx.beginPath(); ctx.moveTo(tx-r*0.25,ty+r*0.1);
+    ctx.quadraticCurveTo(tx-r*0.3,ty-r*0.4,tx,ty-r*0.55); ctx.quadraticCurveTo(tx+r*0.3,ty-r*0.4,tx+r*0.25,ty+r*0.1);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#ffe066"; ctx.beginPath(); ctx.arc(tx,ty-r*0.12,r*0.14,0,7); ctx.fill(); }
+  if (a.extra === "steam") { ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=r*0.09; ctx.lineCap="round";
+    [-0.25,0.1].forEach(o=>{ ctx.beginPath(); ctx.moveTo(tx+o*r,ty+r*0.1);
+      ctx.quadraticCurveTo(tx+o*r-r*0.15,ty-r*0.2,tx+o*r+r*0.1,ty-r*0.45); ctx.stroke(); }); }
+  if (a.extra === "foam") { ctx.fillStyle="#ffffff";
+    ctx.beginPath(); ctx.arc(tx-r*0.2,ty,r*0.28,0,7); ctx.arc(tx+r*0.15,ty-r*0.05,r*0.32,0,7); ctx.arc(tx+r*0.4,ty+r*0.05,r*0.22,0,7); ctx.fill(); }
+  if (a.extra === "bolt") { ctx.fillStyle="#fff200"; ctx.strokeStyle="#a38600"; ctx.lineWidth=r*0.04;
+    const bx=cx+r*0.75, by=cy-r*0.1;
+    ctx.beginPath(); ctx.moveTo(bx,by-r*0.3); ctx.lineTo(bx-r*0.18,by); ctx.lineTo(bx-r*0.02,by); ctx.lineTo(bx-r*0.14,by+r*0.3);
+    ctx.lineTo(bx+r*0.1,by-r*0.02); ctx.lineTo(bx-r*0.04,by-r*0.02); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  if (a.extra === "starleaf") { star(ctx, tx, ty-r*0.2, r*0.28, "#ffe066"); }
+  if (a.extra === "crescent") { ctx.fillStyle="#ffe9a3";
+    ctx.beginPath(); ctx.arc(tx,ty-r*0.15,r*0.3,0,7); ctx.fill();
+    ctx.fillStyle=a.c1; ctx.beginPath(); ctx.arc(tx+r*0.14,ty-r*0.24,r*0.26,0,7); ctx.fill(); }
+  if (a.extra === "drip") { ctx.fillStyle=a.c1; ctx.strokeStyle=a.accent; ctx.lineWidth=r*0.05;
+    ctx.beginPath(); ctx.arc(tx,ty-r*0.25,r*0.16,0,7); ctx.fill(); ctx.stroke(); }
+  if (a.extra === "geyser") { ctx.fillStyle="#9fd8ef"; ctx.strokeStyle="#2f6d8a"; ctx.lineWidth=r*0.05;
+    ctx.beginPath(); ctx.moveTo(tx-r*0.18,ty+r*0.15); ctx.quadraticCurveTo(tx,ty-r*0.7,tx+r*0.18,ty+r*0.15); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  if (a.extra === "flakes") { ctx.strokeStyle=a.accent; ctx.lineWidth=r*0.07;
+    [-0.4,0,0.4].forEach(o=>{ ctx.beginPath(); ctx.arc(cx+o*r, cy-r*0.1, r*0.5, Math.PI*1.15, Math.PI*1.85); ctx.stroke(); }); }
+  if (a.extra === "tusks") { ctx.fillStyle="#fff";
+    [-1,1].forEach(s=>{ ctx.beginPath(); ctx.moveTo(cx+s*r*0.4,cy+r*0.5); ctx.lineTo(cx+s*r*0.5,cy+r*0.85); ctx.lineTo(cx+s*r*0.62,cy+r*0.5); ctx.closePath(); ctx.fill(); }); }
+  if (a.extra === "shell") { ctx.fillStyle=a.c2; ctx.strokeStyle=a.accent; ctx.lineWidth=r*0.05;
+    ctx.beginPath(); ctx.ellipse(cx, cy-r*0.55, r*0.6, r*0.35, 0, Math.PI, 0); ctx.fill(); ctx.stroke(); }
+  if (a.extra === "cup") { // teacup around lower body
+    ctx.fillStyle="#ffffff"; ctx.strokeStyle="#2f6d8a"; ctx.lineWidth=r*0.07;
+    ctx.beginPath(); ctx.moveTo(cx-r*0.95,cy+r*0.35); ctx.lineTo(cx-r*0.7,cy+r*1.25); ctx.lineTo(cx+r*0.7,cy+r*1.25); ctx.lineTo(cx+r*0.95,cy+r*0.35);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx+r*1.05,cy+r*0.7,r*0.25,-1.2,1.2); ctx.stroke(); }
+  // eyes
+  const ex = r*0.34, ey = cy - r*0.12, er = r*0.21;
+  function eye(px) {
+    if (a.eyes === "happy") { ctx.strokeStyle="#3a2a1a"; ctx.lineWidth=r*0.07; ctx.lineCap="round";
+      ctx.beginPath(); ctx.arc(px, ey+r*0.06, er*0.8, Math.PI*1.15, Math.PI*1.85); ctx.stroke(); }
+    else if (a.eyes === "dizzy") { ctx.strokeStyle="#3a2a1a"; ctx.lineWidth=r*0.06; ctx.lineCap="round";
+      [[-1,-1],[1,1]].forEach(()=>{});
+      ctx.beginPath(); ctx.moveTo(px-er*0.6,ey-er*0.6); ctx.lineTo(px+er*0.6,ey+er*0.6);
+      ctx.moveTo(px+er*0.6,ey-er*0.6); ctx.lineTo(px-er*0.6,ey+er*0.6); ctx.stroke(); }
+    else {
+      ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(px, ey, er, 0, 7); ctx.fill();
+      if (a.eyes === "calm") { ctx.fillStyle=a.c1; ctx.fillRect(px-er, ey-er, er*2, er*0.9); }
+      const pr = er*0.45;
+      ctx.fillStyle="#3a2a1a"; ctx.beginPath(); ctx.arc(px, ey+er*0.1, pr, 0, 7); ctx.fill();
+      ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(px-pr*0.3, ey-pr*0.2, pr*0.35, 0, 7); ctx.fill();
+      if (a.eyes === "proud") { ctx.strokeStyle="#3a2a1a"; ctx.lineWidth=r*0.06; ctx.lineCap="round";
+        const s = px < cx ? 1 : -1;
+        ctx.beginPath(); ctx.moveTo(px-s*er*0.9, ey-er*1.15); ctx.lineTo(px+s*er*0.7, ey-er*0.75); ctx.stroke(); }
+    }
+  }
+  eye(cx-ex); eye(cx+ex);
+  // cheeks
+  ctx.fillStyle="rgba(255,130,150,.5)";
+  ctx.beginPath(); ctx.arc(cx-ex*1.35, cy+r*0.22, r*0.11, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx+ex*1.35, cy+r*0.22, r*0.11, 0, 7); ctx.fill();
+  // mouth
+  ctx.strokeStyle="#3a2a1a"; ctx.fillStyle="#3a2a1a"; ctx.lineWidth=r*0.06; ctx.lineCap="round";
+  const my = cy + r*0.34;
+  if (a.mouth === "smile") { ctx.beginPath(); ctx.arc(cx, my-r*0.08, r*0.24, 0.25, Math.PI-0.25); ctx.stroke(); }
+  else if (a.mouth === "open") { ctx.beginPath(); ctx.ellipse(cx, my, r*0.17, r*0.2, 0, 0, 7); ctx.fill(); }
+  else { ctx.beginPath(); ctx.arc(cx, my-r*0.12, r*0.3, 0.3, Math.PI-0.3); ctx.stroke();
+    ctx.fillStyle="#fff"; ctx.fillRect(cx-r*0.2, my+r*0.08, r*0.4, r*0.1); }
+  // rarity accessories
+  if (sp.rarity === "rare") { star(ctx, cx-r*1.05, cy-r*1.05, r*0.16, "#9adcff"); star(ctx, cx+r*1.0, cy-r*0.9, r*0.13, "#9adcff"); star(ctx, cx+r*0.2, cy+r*1.15, r*0.13, "#9adcff"); }
+  if (["epic","legendary","mythic"].includes(sp.rarity)) {
+    // crown
+    const cwy = cy - r*1.28;
+    ctx.fillStyle = sp.rarity==="epic" ? "#c39bff" : "#ffd54a";
+    ctx.strokeStyle = "#7a5c00"; ctx.lineWidth = r*0.04;
+    ctx.beginPath(); ctx.moveTo(cx-r*0.42, cwy+r*0.3); ctx.lineTo(cx-r*0.42, cwy);
+    ctx.lineTo(cx-r*0.2, cwy+r*0.14); ctx.lineTo(cx, cwy-r*0.12); ctx.lineTo(cx+r*0.2, cwy+r*0.14);
+    ctx.lineTo(cx+r*0.42, cwy); ctx.lineTo(cx+r*0.42, cwy+r*0.3); ctx.closePath(); ctx.fill(); ctx.stroke();
+    star(ctx, cx, cwy-r*0.16, r*0.1, "#fff");
+  }
+  if (sp.rarity === "mythic") {
+    for (let i=0;i<5;i++){ const th = (opts.t||0)*0.9 + i*Math.PI*2/5;
+      star(ctx, cx+Math.cos(th)*r*1.6, cy+Math.sin(th)*r*1.6, r*0.14, "#ff9ed2"); }
+  }
+  ctx.restore();
+}
+function drawSilhouette(canvas, sp) {
+  const off = document.createElement("canvas"); off.width = off.height = 160;
+  const c = off.getContext("2d");
+  drawMonster(c, sp, 80, 80, 52, {});
+  c.globalCompositeOperation = "source-in";
+  c.fillStyle = "#2b2b3a"; c.fillRect(0,0,160,160);
+  const ctx = canvas.getContext("2d"); ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
+}
+function portrait(canvas, sp, opts={}) {
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawMonster(ctx, sp, canvas.width/2, canvas.height/2, canvas.width*0.32, opts);
+}
+
+/* ================= GAME STATE ================= */
+const SAVE_KEY = "hatchem_save_v1";
+let S = null;
+function defaultState() {
+  return {
+    coins: 100, eggs: [{id:1},{id:2},{id:3}], eggSeq: 4,
+    monsters: [], monSeq: 1, team: [],
+    dexSeen: {}, hatches: 0, pityEgg: 0, pityPack: 0,
+    campaign: 0, // index of next unbeaten trainer
+    campBeaten: {},
+    nextEggAt: Date.now() + 4*60*1000,
+    settings: { mute: false },
+    started: false,
+  };
+}
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){} }
+function load() {
+  try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { S = JSON.parse(raw); return; } } catch(e){}
+  S = defaultState();
+}
+/* ================= MONSTER INSTANCES ================= */
+function statsFor(sp, level) {
+  const m = 1 + (level-1)*0.07;
+  return {
+    hp: Math.round(sp.base.hp*m) + level*3,
+    atk: Math.round(sp.base.atk*m),
+    def: Math.round(sp.base.def*m),
+    spd: Math.round(sp.base.spd*m),
+  };
+}
+function xpNext(level) { return Math.floor(30 * Math.pow(level, 1.4)); }
+function makeMonster(speciesId, level=1) {
+  const sp = SP_BY_ID[speciesId];
+  const st = statsFor(sp, level);
+  return { uid: S.monSeq++, species: speciesId, level, xp: 0, hp: st.hp };
+}
+function monSpecies(m) { return SP_BY_ID[m.species]; }
+function monStats(m) { return statsFor(monSpecies(m), m.level); }
+function monMoves(m) {
+  const sp = monSpecies(m);
+  return [
+    { name: "Nibble", element: null, power: 40 },
+    { name: ELEMV[sp.element], element: sp.element, power: 65 },
+  ];
+}
+function gainXP(m, amount) {
+  if (m.level >= 50) return [];
+  m.xp += amount;
+  const evos = [];
+  while (m.level < 50 && m.xp >= xpNext(m.level)) {
+    m.xp -= xpNext(m.level); m.level++;
+    const sp = monSpecies(m);
+    if (sp.evo && m.level >= sp.evo.at) {
+      const from = sp.name;
+      m.species = sp.evo.to;
+      evos.push({ uid: m.uid, from, to: SP_BY_ID[m.species].name });
+    }
+  }
+  const st = monStats(m); m.hp = Math.min(st.hp, m.hp + Math.ceil(st.hp*0.25));
+  return evos;
+}
+/* ================= HATCHING ================= */
+function rollRarity(pity) {
+  // pity: hatches since Epic+ ; at >=7 the 8th is guaranteed Epic+
+  if (pity >= 7) {
+    const t = RARITY_ODDS.epic + RARITY_ODDS.legendary + RARITY_ODDS.mythic;
+    const r = Math.random()*t;
+    if (r < RARITY_ODDS.epic) return "epic";
+    if (r < RARITY_ODDS.epic + RARITY_ODDS.legendary) return "legendary";
+    return "mythic";
+  }
+  const t = 100, r = Math.random()*t;
+  let acc = 0;
+  for (const rar of RARITY_ORDER) { acc += RARITY_ODDS[rar]; if (r < acc) return rar; }
+  return "common";
+}
+function rollSpecies(rarity) {
+  const pool = SPECIES.filter(s => s.rarity === rarity);
+  return pick(pool).id;
+}
+function doHatch() {
+  if (!S.eggs.length) return null;
+  S.eggs.shift();
+  S.hatches++;
+  let rarity;
+  if (S.hatches === 1) {
+    // first hatch ever: guaranteed Rare+
+    const t = RARITY_ODDS.rare + RARITY_ODDS.epic + RARITY_ODDS.legendary + RARITY_ODDS.mythic;
+    const r = Math.random()*t;
+    rarity = r < RARITY_ODDS.rare ? "rare" : r < RARITY_ODDS.rare+RARITY_ODDS.epic ? "epic"
+      : r < RARITY_ODDS.rare+RARITY_ODDS.epic+RARITY_ODDS.legendary ? "legendary" : "mythic";
+  } else rarity = rollRarity(S.pityEgg);
+  const isBig = ["epic","legendary","mythic"].includes(rarity);
+  S.pityEgg = isBig ? 0 : S.pityEgg + 1;
+  const m = makeMonster(rollSpecies(rarity), 1);
+  const isNew = !S.dexSeen[m.species];
+  S.dexSeen[m.species] = true;
+  S.monsters.push(m);
+  if (S.team.length < 3 && !S.team.includes(m.uid)) S.team.push(m.uid);
+  save();
+  return { monster: m, rarity, isNew };
+}
+function doPack() {
+  if (S.coins < 150) return null;
+  S.coins -= 150;
+  const out = [];
+  for (let i=0;i<3;i++) {
+    const rarity = rollRarity(S.pityPack);
+    const isBig = ["epic","legendary","mythic"].includes(rarity);
+    S.pityPack = isBig ? 0 : S.pityPack + 1;
+    const m = makeMonster(rollSpecies(rarity), 1);
+    const isNew = !S.dexSeen[m.species];
+    S.dexSeen[m.species] = true;
+    S.monsters.push(m);
+    if (S.team.length < 3 && !S.team.includes(m.uid)) S.team.push(m.uid);
+    out.push({ monster: m, rarity, isNew });
+  }
+  save();
+  return out;
+}
+/* ================= FREE EGG TIMER ================= */
+const EGG_MS = 4*60*1000, EGG_CAP = 3;
+function tickEggs() {
+  const now = Date.now();
+  let added = 0;
+  while (S.eggs.length < EGG_CAP && now >= S.nextEggAt) {
+    S.eggs.push({ id: S.eggSeq++ }); added++;
+    S.nextEggAt += EGG_MS;
+  }
+  if (S.eggs.length >= EGG_CAP) S.nextEggAt = now + EGG_MS;
+  if (added) save();
+  return added;
+}
+function eggCountdown() {
+  const ms = Math.max(0, S.nextEggAt - Date.now());
+  const m = Math.floor(ms/60000), s = Math.floor(ms%60000/1000);
+  return S.eggs.length >= EGG_CAP ? "FULL!" : `${m}:${String(s).padStart(2,"0")}`;
+}
+/* ================= UI HELPERS ================= */
+function show(id) {
+  document.querySelectorAll(".screen").forEach(e => e.classList.remove("active"));
+  $(id).classList.add("active");
+  document.querySelectorAll("#navbar button").forEach(b =>
+    b.classList.toggle("on", b.dataset.scr === id));
+  window.scrollTo(0,0);
+}
+function overlay(html) { $("overlay-panel").innerHTML = html; $("overlay").classList.add("show"); }
+function closeOverlay() { $("overlay").classList.remove("show"); }
+function elemBadge(el) { return el ? `<span class="elem e-${el}">${ELEMOJI[el]} ${el}</span>` : `<span class="elem">✋ Nibble</span>`; }
+function rarityBadge(r) { return `<span class="badge b-${r}">${r.toUpperCase()}</span>`; }
+function refreshTop() {
+  $("tb-coins").textContent = S.coins;
+  $("tb-eggs").textContent = S.eggs.length;
+  $("tb-eggtimer").textContent = S.eggs.length >= EGG_CAP ? "" : "⏳" + eggCountdown();
+  $("tb-dex").textContent = dexPct() + "%";
+  const sc = $("shop-coins"); if (sc) sc.textContent = S.coins;
+}
+function dexPct() { return Math.round(Object.keys(S.dexSeen).length / SPECIES.length * 100); }
+function monCard(m, extra="") {
+  const sp = monSpecies(m), st = monStats(m);
+  return `<div class="card"><div class="row">
+    <canvas width="120" height="120" style="width:84px;height:84px" data-portrait="${m.uid}"></canvas>
+    <div style="flex:1"><b>${sp.name}</b> <span style="font-size:13px">Lv ${m.level}</span><br>
+    ${rarityBadge(sp.rarity)} ${elemBadge(sp.element)}<br>
+    <span style="font-size:13px">❤️${st.hp} ⚔️${st.atk} 🛡️${st.def} 💨${st.spd}</span>${extra}</div>
+  </div></div>`;
+}
+function paintPortraits(root=document) {
+  root.querySelectorAll("canvas[data-portrait]").forEach(c => {
+    const m = S.monsters.find(x => x.uid == c.dataset.portrait);
+    if (m) portrait(c, monSpecies(m), { t: 0 });
+  });
+}
+
+/* ================= HOME ================= */
+function renderHome() {
+  const ht = $("home-team"); ht.innerHTML = "";
+  S.team.forEach(uid => {
+    const m = S.monsters.find(x => x.uid === uid); if (!m) return;
+    const c = document.createElement("canvas"); c.width = c.height = 96;
+    portrait(c, monSpecies(m), {});
+    const d = document.createElement("div"); d.style.textAlign = "center";
+    d.appendChild(c);
+    d.insertAdjacentHTML("beforeend", `<div style="font-size:12px"><b>${monSpecies(m).name}</b><br>Lv ${m.level}</div>`);
+    ht.appendChild(d);
+  });
+  if (!S.team.length) ht.innerHTML = `<div style="font-size:14px;color:#7a5c3e">Hatch an egg to meet your first buddy!</div>`;
+  $("home-eggct").textContent = `(${S.eggs.length})`;
+  $("home-timer").textContent = S.eggs.length >= EGG_CAP ? "FULL! 🎉" : eggCountdown();
+}
+/* ================= EGGS ================= */
+function renderEggs() {
+  const g = $("egg-grid"); g.innerHTML = "";
+  $("egg-empty").style.display = S.eggs.length ? "none" : "block";
+  S.eggs.forEach((e, i) => {
+    const d = document.createElement("div"); d.className = "slot";
+    const c = document.createElement("canvas"); c.width = 120; c.height = 140;
+    const x = c.getContext("2d"); drawEggShape(x, 60, 70, 52, 0);
+    d.appendChild(c);
+    d.insertAdjacentHTML("beforeend", `<div class="nm">Mystery Egg</div><div style="font-size:12px">Tap to hatch!</div>`);
+    d.onclick = () => hatchCeremony(i);
+    g.appendChild(d);
+  });
+}
+function hatchCeremony(eggIndex) {
+  if (!S.eggs.length) return;
+  sfx.tap();
+  overlay(`<h2>Get ready…</h2><canvas class="stage" id="hatch-cv" width="340" height="340"></canvas>
+    <div id="hatch-msg" style="font-size:20px;min-height:30px">Something is stirring inside! 🥚</div>`);
+  const cv = $("hatch-cv"), ctx = cv.getContext("2d");
+  let phase = 0, t = 0;
+  const msgs = ["Something is stirring inside! 🥚", "It's wiggling! 👀", "Crack! Crack! 💥"];
+  const iv = setInterval(() => {
+    t++;
+    ctx.clearRect(0,0,340,340);
+    const wob = phase < 2 ? Math.sin(t*0.9)*10 : 0;
+    ctx.save(); ctx.translate(170 + wob, 185); if (phase < 2) ctx.rotate(Math.sin(t*0.9)*0.12); ctx.translate(-170,-185);
+    drawEggShape(ctx, 170, 185, 95, phase >= 2 ? Math.min(3, t-14) : 0);
+    ctx.restore();
+    if (t === 10) { phase = 1; $("hatch-msg").textContent = msgs[1]; sfx.tap(); }
+    if (t === 20) { phase = 2; $("hatch-msg").textContent = msgs[2]; sfx.hatch_crack(); }
+    if (t >= 34) {
+      clearInterval(iv);
+      const res = doHatch();
+      if (!res) { closeOverlay(); return; }
+      const { monster:m, rarity, isNew } = res;
+      const sp = monSpecies(m);
+      // flash + reveal
+      ctx.clearRect(0,0,340,340);
+      ctx.fillStyle = "#fff"; ctx.fillRect(0,0,340,340);
+      setTimeout(() => {
+        ctx.clearRect(0,0,340,340);
+        drawMonster(ctx, sp, 170, 175, 95, {});
+        if (["rare","epic","legendary","mythic"].includes(rarity)) sfx.rare(); else sfx.fanfare();
+        const big = ["epic","legendary","mythic"].includes(rarity);
+        overlay(`<div class="${big?"reveal-flash":""}">
+          <canvas class="stage" id="rev-cv" width="340" height="300"></canvas>
+          <div>${rarityBadge(rarity)} ${isNew?'<span class="badge" style="background:#2fbf4f">NEW!</span>':''}</div>
+          <h2 class="r-${rarity}" style="margin:6px 0">It's ${sp.name}! 🎉</h2>
+          <div>${elemBadge(sp.element)}</div>
+          <p style="font-size:15px"><i>"${sp.desc}"</i></p>
+          ${isNew?`<p>📖 New Hatchidex entry! (${dexPct()}%)</p>`:""}
+          <button class="btn green" onclick="closeOverlay();sfx.tap()">Yay! 💛</button></div>`);
+        portrait($("rev-cv"), sp, {});
+        refreshTop();
+      }, 450);
+    }
+  }, 90);
+}
+/* ================= DEX ================= */
+let dexSel = null;
+function renderDex() {
+  $("dex-pct").textContent = `Discovered ${Object.keys(S.dexSeen).length} / ${SPECIES.length} (${dexPct()}%)`;
+  const g = $("dex-grid"); g.innerHTML = "";
+  SPECIES.forEach(sp => {
+    const seen = S.dexSeen[sp.id];
+    const d = document.createElement("div"); d.className = "slot" + (dexSel===sp.id?" sel":"");
+    const c = document.createElement("canvas"); c.width = c.height = 120;
+    if (seen) portrait(c, sp, {}); else drawSilhouette(c, sp);
+    d.appendChild(c);
+    d.insertAdjacentHTML("beforeend", `<div class="nm">${seen?sp.name:"???"}</div>${seen?rarityBadge(sp.rarity):""}`);
+    d.onclick = () => { sfx.tap(); dexSel = sp.id; renderDex(); };
+    g.appendChild(d);
+  });
+  const dd = $("dex-detail"); dd.innerHTML = "";
+  if (dexSel) {
+    const sp = SP_BY_ID[dexSel];
+    if (S.dexSeen[sp.id]) {
+      const evo = sp.evo ? `<div style="font-size:14px">🔄 Evolves into <b>${SP_BY_ID[sp.evo.to].name}</b> at Lv ${sp.evo.at}</div>`
+        : `<div style="font-size:14px">⭐ Fully evolved!</div>`;
+      // find pre-evolution
+      const pre = SPECIES.find(s => s.evo && s.evo.to === sp.id);
+      dd.innerHTML = `<div class="card center"><canvas width="160" height="160" style="width:120px;height:120px" id="dex-big"></canvas>
+        <h3 class="r-${sp.rarity}" style="margin:4px">${sp.name}</h3>
+        <div>${rarityBadge(sp.rarity)} ${elemBadge(sp.element)}</div>
+        <p><i>"${sp.desc}"</i></p>
+        <div style="font-size:14px">❤️${sp.base.hp} ⚔️${sp.base.atk} 🛡️${sp.base.def} 💨${sp.base.spd} (base)</div>
+        ${pre?`<div style="font-size:14px">🐣 Evolves from <b>${pre.name}</b></div>`:""}${evo}
+        <button class="btn small gray" onclick="dexSel=null;renderDex()">Close</button></div>`;
+      portrait($("dex-big"), sp, {});
+    } else dd.innerHTML = `<div class="card center">❓ <b>???</b><br>Keep hatching eggs to discover this monster!</div>`;
+  }
+}
+/* ================= TEAM ================= */
+function renderTeam() {
+  const ts = $("team-slots"); ts.innerHTML = "";
+  for (let i=0;i<3;i++) {
+    const uid = S.team[i], m = S.monsters.find(x => x.uid === uid);
+    const d = document.createElement("div"); d.className = "slot";
+    if (m) { const c = document.createElement("canvas"); c.width=c.height=96; portrait(c, monSpecies(m), {});
+      d.appendChild(c); d.insertAdjacentHTML("beforeend", `<div class="nm">${monSpecies(m).name}</div><div style="font-size:11px">Lv ${m.level}</div>`); }
+    else d.innerHTML = `<div style="font-size:36px;margin-top:20px">➕</div><div class="nm">Empty</div>`;
+    ts.appendChild(d);
+  }
+  const g = $("team-grid"); g.innerHTML = "";
+  $("team-count").textContent = S.monsters.length;
+  const sorted = [...S.monsters].sort((a,b)=> RARITY_ORDER.indexOf(monSpecies(b).rarity) - RARITY_ORDER.indexOf(monSpecies(a).rarity) || b.level - a.level);
+  sorted.forEach(m => {
+    const sp = monSpecies(m);
+    const d = document.createElement("div"); d.className = "slot" + (S.team.includes(m.uid)?" sel":"");
+    const c = document.createElement("canvas"); c.width=c.height=96; portrait(c, sp, {});
+    d.appendChild(c);
+    d.insertAdjacentHTML("beforeend", `<div class="nm">${sp.name}</div><div style="font-size:11px">Lv ${m.level} ${rarityBadge(sp.rarity)}</div>`);
+    d.onclick = () => {
+      sfx.tap();
+      const ix = S.team.indexOf(m.uid);
+      if (ix >= 0) { if (S.team.length > 1) S.team.splice(ix,1); }
+      else { if (S.team.length < 3) S.team.push(m.uid); else { S.team.shift(); S.team.push(m.uid); } }
+      save(); renderTeam(); refreshTop();
+    };
+    g.appendChild(d);
+  });
+}
+/* ================= SHOP ================= */
+function renderShop() { refreshTop(); }
+function buyPack() {
+  if (S.coins < 150) { sfx.weak(); return; }
+  sfx.coin();
+  const pack = doPack(); if (!pack) return;
+  let revealed = 0;
+  overlay(`<h2>🃏 Booster Pack!</h2><div class="grid" id="pack-grid"></div><div id="pack-msg">Tap a card to reveal! ✨</div>`);
+  const g = $("pack-grid");
+  pack.forEach((r, i) => {
+    const d = document.createElement("div"); d.className = "slot";
+    d.innerHTML = `<div style="font-size:52px;margin-top:14px">🃏</div><div class="nm">???</div>`;
+    d.onclick = () => {
+      if (d.dataset.open) return; d.dataset.open = "1"; revealed++;
+      const sp = monSpecies(r.monster);
+      d.innerHTML = ""; const c = document.createElement("canvas"); c.width=c.height=110;
+      portrait(c, sp, {}); d.appendChild(c);
+      d.insertAdjacentHTML("beforeend", `<div class="nm">${sp.name}</div>${rarityBadge(r.rarity)}${r.isNew?'<div style="font-size:11px">📖 NEW!</div>':""}`);
+      if (["epic","legendary","mythic"].includes(r.rarity)) sfx.rare(); else sfx.pop();
+      if (revealed === 3) { $("pack-msg").innerHTML = `<button class="btn green" onclick="closeOverlay();sfx.tap()">Awesome! 💛</button>`; refreshTop(); }
+    };
+    g.appendChild(d);
+  });
+  refreshTop();
+}
+/* ================= EVOLUTION ================= */
+function evolutionCeremony(evos, done) {
+  if (!evos.length) { done(); return; }
+  const ev = evos[0];
+  const m = S.monsters.find(x => x.uid === ev.uid);
+  const fromSp = SPECIES.find(s => s.name === ev.from), toSp = SP_BY_ID[m.species];
+  sfx.evolve();
+  overlay(`<h2>✨ What?! ${ev.from} is evolving! ✨</h2><canvas class="stage" id="evo-cv" width="340" height="300"></canvas><div id="evo-msg"></div>`);
+  const cv = $("evo-cv"), ctx = cv.getContext("2d");
+  let t = 0;
+  const iv = setInterval(() => {
+    t++;
+    ctx.clearRect(0,0,340,340);
+    const flash = t % 6 < 3;
+    const sc = 1 + Math.sin(t*0.5)*0.08;
+    ctx.save(); ctx.translate(170,160); ctx.scale(sc,sc); ctx.translate(-170,-160);
+    drawMonster(ctx, t < 26 ? fromSp : toSp, 170, 160, 88, {});
+    if (flash) { ctx.globalAlpha = 0.45; ctx.fillStyle = "#fff"; ctx.fillRect(0,0,340,340); ctx.globalAlpha = 1; }
+    ctx.restore();
+    if (t === 26) { sfx.fanfare(); $("evo-msg").innerHTML = `<h2>🎉 Congratulations!<br>Your ${ev.from} evolved into <span class="r-${toSp.rarity}">${ev.to}</span>!</h2>
+      <button class="btn green" id="evo-ok">Amazing! 💛</button>`;
+      $("evo-ok").onclick = () => { sfx.tap(); evolutionCeremony(evos.slice(1), done); };
+      clearInterval(iv);
+    }
+  }, 110);
+  save();
+}
+/* ================= SETTINGS ================= */
+function renderSettings() { updateMuteBtns(); }
+function updateMuteBtns() {
+  const t = S.settings.mute ? "🔇 Sound: Off" : "🔊 Sound: On";
+  $("btn-mute").textContent = t; $("btn-mute-title").textContent = t;
+}
+function toggleMute() { S.settings.mute = !S.settings.mute; save(); updateMuteBtns(); sfx.tap(); }
+function newGame() {
+  if (confirm("Start over? This erases ALL your monsters, eggs and coins!")) {
+    if (confirm("Really really sure? 🥺")) {
+      localStorage.removeItem(SAVE_KEY); S = defaultState(); save();
+      show("scr-title"); refreshTop(); sfx.lose();
+    }
+  }
+}
+
+/* ================= BATTLE ================= */
+let B = null;
+function healTeam() { S.monsters.forEach(m => { m.hp = monStats(m).hp; }); save(); }
+function wildTeam() {
+  const avg = Math.max(1, Math.round(S.team.reduce((s,uid)=>{ const m=S.monsters.find(x=>x.uid===uid); return s+(m?m.level:1); },0)/Math.max(1,S.team.length)));
+  const n = ri(1, 3);
+  const pool = SPECIES.filter(s => {
+    if (s.rarity === "common") return true;
+    if (s.rarity === "rare") return avg >= 4;
+    if (s.rarity === "epic") return avg >= 12;
+    return avg >= 22;
+  });
+  const team = [];
+  for (let i=0;i<n;i++) team.push(makeMonster(pick(pool.length?pool:SPECIES).id, clamp(avg + ri(-2,2), 1, 50)));
+  return team;
+}
+function startBattle(mode, trainerIdx=-1) {
+  if (!S.team.length) return;
+  healTeam();
+  const pteam = S.team.map(uid => S.monsters.find(x => x.uid === uid)).filter(Boolean);
+  let eteam, title;
+  if (mode === "wild") { eteam = wildTeam(); title = "A wild monster appeared! 🌿"; }
+  else {
+    const t = TRAINERS[trainerIdx];
+    eteam = t.team.map(([sid, lv]) => makeMonster(sid, lv));
+    title = `${t.name} wants to battle! 🏆`;
+  }
+  B = { mode, trainerIdx, pteam, eteam, pIdx: 0, eIdx: 0, busy: false, over: false,
+        participants: new Set([pteam[0].uid]), title };
+  $("b-run").style.display = mode === "wild" ? "" : "none";
+  show("scr-battle");
+  $("blog").textContent = title;
+  updateBattleUI();
+  refreshTop();
+}
+function curP() { return B.pteam[B.pIdx]; }
+function curE() { return B.eteam[B.eIdx]; }
+function updateBattleUI() {
+  const p = curP(), e = curE();
+  const ps = monSpecies(p), es = monSpecies(e);
+  const pst = monStats(p), est = monStats(e);
+  $("b-ename").textContent = es.name; $("b-elvl").textContent = "Lv " + e.level;
+  $("b-eelem").innerHTML = elemBadge(es.element);
+  $("b-pname").textContent = ps.name; $("b-plvl").textContent = "Lv " + p.level;
+  $("b-pelem").innerHTML = elemBadge(ps.element);
+  portrait($("b-ecanv"), es, {}); portrait($("b-pcanv"), ps, {});
+  const epc = clamp(e.hp/est.hp*100,0,100), ppc = clamp(p.hp/pst.hp*100,0,100);
+  const eh = $("b-ehp"); eh.style.width = epc+"%"; eh.classList.toggle("low", epc<30);
+  const ph = $("b-php"); ph.style.width = ppc+"%"; ph.classList.toggle("low", ppc<30);
+  $("b-ehpnum").textContent = `${Math.max(0,e.hp)} / ${est.hp}`;
+  $("b-phpnum").textContent = `${Math.max(0,p.hp)} / ${pst.hp}`;
+  $("b-pxp").style.width = clamp(p.xp/xpNext(p.level)*100,0,100)+"%";
+  $("b-eballs").textContent = B.eteam.map(m => m.hp > 0 ? "🔴" : "⚪").join("");
+  $("b-pballs").textContent = B.pteam.map(m => m.hp > 0 ? "🔵" : "⚪").join("");
+  const mv = monMoves(p);
+  mv.forEach((m,i) => {
+    const btn = $("b-m"+(i+1));
+    const eff = m.element ? matchup(m.element, es.element) : 1;
+    const hint = eff > 1 ? " ✨" : eff < 1 ? " 💧" : "";
+    btn.innerHTML = `${m.name}${hint}<br><span class="tag">${m.element?ELEMOJI[m.element]+" "+m.element:"neutral"} · pow ${m.power}</span>`;
+    btn.disabled = B.busy || B.over;
+  });
+  $("b-switch").disabled = B.busy || B.over;
+  $("b-switchlist").classList.add("hidden");
+}
+function calcDamage(att, def, move) {
+  const as = monStats(att), ds = monStats(def);
+  const stab = (move.element && move.element === monSpecies(att).element) ? 1.4 : 1;
+  const mult = matchup(move.element, monSpecies(def).element);
+  return { dmg: Math.max(1, Math.floor(move.power * (as.atk/(ds.def+8)) * (1+att.level/60) * stab * mult * rnd(0.85,1))), mult };
+}
+function doAttack(att, def, move, attIsPlayer, cb) {
+  const { dmg, mult } = calcDamage(att, def, move);
+  def.hp = Math.max(0, def.hp - dmg);
+  if (mult > 1) sfx.superhit(); else if (mult < 1) sfx.weak(); else sfx.hit();
+  const an = monSpecies(att).name, dn = monSpecies(def).name;
+  $("blog").textContent = `${an} used ${move.name}! ${matchText(mult)} (-${dmg})`;
+  updateBattleUI();
+  setTimeout(() => {
+    if (def.hp <= 0) {
+      $("blog").textContent = `${dn} fainted! 😵`;
+      setTimeout(cb, 700);
+    } else cb();
+  }, 800);
+}
+function enemyMove() {
+  const e = curE(), p = curP();
+  const mv = monMoves(e);
+  const good = matchup(mv[1].element, monSpecies(p).element) >= 1;
+  return (good && Math.random() < 0.75) || Math.random() < 0.4 ? mv[1] : mv[0];
+}
+function playerMove(i) {
+  if (!B || B.busy || B.over) return;
+  sfx.tap(); B.busy = true; updateBattleUI();
+  const p = curP(), e = curE(), mv = monMoves(p)[i];
+  const pFirst = monStats(p).spd >= monStats(e).spd;
+  const seq = pFirst ? ["p","e"] : ["e","p"];
+  let step = 0;
+  function next() {
+    if (B.over) return;
+    if (step >= seq.length) { B.busy = false; updateBattleUI(); return; }
+    const who = seq[step++];
+    if (who === "p") {
+      if (p.hp <= 0) { next(); return; }
+      doAttack(p, e, mv, true, () => {
+        if (e.hp <= 0) enemyFainted(); else next();
+      });
+    } else {
+      if (e.hp <= 0) { next(); return; }
+      doAttack(e, p, enemyMove(), false, () => {
+        if (p.hp <= 0) playerFainted(); else next();
+      });
+    }
+  }
+  next();
+}
+function enemyFainted() {
+  const nx = B.eteam.findIndex(m => m.hp > 0);
+  if (nx < 0) return victory();
+  B.eIdx = nx;
+  $("blog").textContent = `${monSpecies(curE()).name} steps up!`;
+  setTimeout(() => { B.busy = false; updateBattleUI(); }, 800);
+}
+function playerFainted() {
+  const alive = B.pteam.filter(m => m.hp > 0);
+  if (!alive.length) return defeat();
+  $("blog").textContent = `Choose your next buddy! 💛`;
+  showSwitchList(true);
+}
+function showSwitchList(forced) {
+  const sl = $("b-switchlist"); sl.classList.remove("hidden");
+  sl.innerHTML = `<div class="card"><b>Switch to:</b><div class="grid" id="sw-grid"></div>
+    ${forced?"":`<button class="btn small gray" id="sw-cancel">Cancel</button>`}</div>`;
+  const g = $("sw-grid");
+  B.pteam.forEach((m, i) => {
+    if (i === B.pIdx || m.hp <= 0) return;
+    const d = document.createElement("div"); d.className = "slot";
+    const c = document.createElement("canvas"); c.width=c.height=80; portrait(c, monSpecies(m), {});
+    d.appendChild(c);
+    d.insertAdjacentHTML("beforeend", `<div class="nm">${monSpecies(m).name}</div><div style="font-size:11px">Lv ${m.level}</div>`);
+    d.onclick = () => {
+      sfx.tap(); B.pIdx = i; B.participants.add(m.uid);
+      $("blog").textContent = `Go, ${monSpecies(m).name}!`;
+      sl.classList.add("hidden");
+      if (forced) { B.busy = false; updateBattleUI(); }
+      else { // switching costs the turn
+        B.busy = true; updateBattleUI();
+        setTimeout(() => doAttack(curE(), curP(), enemyMove(), false, () => {
+          if (curP().hp <= 0) playerFainted(); else { B.busy = false; updateBattleUI(); }
+        }), 700);
+      }
+    };
+    g.appendChild(d);
+  });
+  const c = $("sw-cancel"); if (c) c.onclick = () => { sfx.tap(); sl.classList.add("hidden"); };
+}
+function runAway() {
+  if (!B || B.busy || B.over || B.mode !== "wild") return;
+  sfx.tap(); B.over = true;
+  $("blog").textContent = "You ran away safely! 🏃";
+  setTimeout(() => { healTeam(); show("scr-battlet"); renderBattleMenu(); }, 900);
+}
+function battleRewards() {
+  const avgEl = B.eteam.reduce((s,m)=>s+m.level,0)/B.eteam.length;
+  if (B.mode === "wild") {
+    const coins = Math.round(20 + avgEl*2.5);
+    const egg = Math.random() < 0.4 ? 1 : 0;
+    return { coins, eggs: egg, xpEach: Math.round(8 + avgEl*3) };
+  }
+  const t = TRAINERS[B.trainerIdx];
+  const first = !S.campBeaten[B.trainerIdx];
+  return { coins: t.reward.coins + (first ? t.first.coins : 0), eggs: t.reward.egg,
+           xpEach: Math.round(12 + avgEl*4), first };
+}
+function victory() {
+  B.over = true; sfx.win();
+  const r = battleRewards();
+  S.coins += r.coins;
+  for (let i=0;i<r.eggs;i++) if (S.eggs.length < 6) S.eggs.push({ id: S.eggSeq++ });
+  const evos = [], leveled = [];
+  B.pteam.forEach(m => {
+    if (!B.participants.has(m.uid)) return;
+    const before = m.level;
+    gainXP(m, r.xpEach).forEach(ev => evos.push(ev));
+    if (m.level > before) leveled.push(`${monSpecies(m).name} grew to Lv ${m.level}!`);
+  });
+  if (B.mode === "campaign") {
+    S.campBeaten[B.trainerIdx] = true;
+    S.campaign = Math.max(S.campaign, B.trainerIdx + 1);
+  }
+  save(); healTeam(); refreshTop();
+  overlay(`<h2>🏆 Victory!</h2>
+    <p style="font-size:19px">+🪙${r.coins} coins!${r.eggs?` +🥚${r.eggs} egg${r.eggs>1?"s":""}!`:""}</p>
+    <p>Your buddies gained ${r.xpEach} XP each!${r.first?"<br>🌟 First-win bonus!":""}</p>
+    ${leveled.map(l=>`<div>⬆️ ${l}</div>`).join("")}
+    <button class="btn green" id="vic-ok">Yay! 💛</button>`);
+  $("vic-ok").onclick = () => {
+    sfx.tap(); closeOverlay();
+    evolutionCeremony(evos, () => { show("scr-battlet"); renderBattleMenu(); refreshTop(); });
+  };
+}
+function defeat() {
+  B.over = true; sfx.lose();
+  const coins = 10;
+  S.coins += coins; save(); healTeam(); refreshTop();
+  overlay(`<h2>😢 Defeat…</h2><p>Your buddies did their best!<br>Here's 🪙${coins} for trying. They've been healed! 💛</p>
+    <button class="btn blue" id="def-ok">Try Again!</button>`);
+  $("def-ok").onclick = () => { sfx.tap(); closeOverlay(); show("scr-battlet"); renderBattleMenu(); };
+}
+/* ================= BATTLE MENU ================= */
+function renderBattleMenu() {
+  const cl = $("camp-list"); cl.innerHTML = "";
+  TRAINERS.forEach((t, i) => {
+    const beaten = S.campBeaten[i];
+    const locked = i > S.campaign;
+    const b = document.createElement("button");
+    b.className = "btn small " + (beaten ? "green" : locked ? "gray" : "blue");
+    b.innerHTML = `${beaten?"✅":locked?"🔒":"🏆"} ${t.name}<br><span style="font-size:12px">${t.title}</span>`;
+    b.disabled = locked;
+    b.onclick = () => { if (!locked) { sfx.tap(); startBattle("campaign", i); } };
+    cl.appendChild(b);
+  });
+}
+
+/* ================= INIT ================= */
+function go(id, render) {
+  return () => { sfx.tap(); audio(); show(id); if (render) render(); refreshTop(); };
+}
+function init() {
+  load();
+  tickEggs();
+  // nav
+  document.querySelectorAll("#navbar button").forEach(b => {
+    b.onclick = () => {
+      sfx.tap(); audio();
+      const id = b.dataset.scr;
+      show(id);
+      if (id === "scr-home") renderHome();
+      if (id === "scr-eggs") renderEggs();
+      if (id === "scr-dex") renderDex();
+      if (id === "scr-team") renderTeam();
+      if (id === "scr-battlet") renderBattleMenu();
+      if (id === "scr-shop") renderShop();
+      refreshTop();
+    };
+  });
+  $("btn-start").onclick = () => {
+    sfx.tap(); audio();
+    if (!S.started) {
+      S.started = true; save();
+      overlay(`<h2>Welcome, Hatcher! 🥚</h2>
+        <p>You found <b>3 mystery eggs</b>! Tap one on the Eggs tab to hatch your first buddy.</p>
+        <p>Your <b>first hatch is extra lucky</b>… ✨</p>
+        <button class="btn pink" id="w-ok">Let's go!</button>`);
+      $("w-ok").onclick = () => { sfx.tap(); closeOverlay(); show("scr-eggs"); renderEggs(); refreshTop(); };
+    } else { show("scr-home"); renderHome(); }
+    refreshTop();
+  };
+  $("btn-go-eggs").onclick = go("scr-eggs", renderEggs);
+  $("btn-go-battle").onclick = go("scr-battlet", renderBattleMenu);
+  $("btn-go-dex").onclick = go("scr-dex", renderDex);
+  $("btn-go-team").onclick = go("scr-team", renderTeam);
+  $("btn-go-shop").onclick = go("scr-shop", renderShop);
+  $("btn-go-settings").onclick = () => { sfx.tap(); show("scr-settings"); renderSettings(); };
+  $("btn-wild").onclick = () => { sfx.tap(); startBattle("wild"); };
+  $("btn-buypack").onclick = () => { sfx.tap(); buyPack(); };
+  $("b-m1").onclick = () => playerMove(0);
+  $("b-m2").onclick = () => playerMove(1);
+  $("b-switch").onclick = () => { sfx.tap(); showSwitchList(false); };
+  $("b-run").onclick = runAway;
+  $("btn-mute").onclick = toggleMute;
+  $("btn-mute-title").onclick = toggleMute;
+  $("btn-newgame").onclick = newGame;
+  $("overlay").addEventListener("click", e => { if (e.target.id === "overlay") { /* keep modal */ } });
+  updateMuteBtns();
+  show("scr-title");
+  refreshTop();
+  // per-second tick: egg timer + topbar
+  setInterval(() => { if (tickEggs()) { refreshTop(); if ($("scr-home").classList.contains("active")) renderHome(); } refreshTop(); }, 1000);
+  // expose for automated testing
+  window.HATCHEM = { get S(){return S;}, get B(){return B;}, doHatch, doPack, startBattle, playerMove, gainXP, SPECIES, TRAINERS, show, renderHome };
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
