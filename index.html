@@ -761,13 +761,14 @@ function vScroller() {
   if (ov && panel && ov.classList.contains("show") && panel.scrollHeight > panel.clientHeight + 8) return panel;
   return null;
 }
+function setDisp(e, v) { if (e && e.style.display !== v) e.style.display = v; }
 function vMeasure() {
   const up = $("vUp"), down = $("vDown");
   if (!up || !down) return;
   const sc = vScroller();
   const max = sc ? sc.scrollHeight - sc.clientHeight
                  : document.documentElement.scrollHeight - window.innerHeight;
-  if (max <= 8) { up.style.display = "none"; down.style.display = "none"; return; }
+  if (max <= 8) { setDisp(up, "none"); setDisp(down, "none"); return; }
   vState();
 }
 function vState() {
@@ -778,9 +779,9 @@ function vState() {
   if (sc) { y = sc.scrollTop; max = sc.scrollHeight - sc.clientHeight; }
   else { y = window.scrollY || document.documentElement.scrollTop || 0;
          max = document.documentElement.scrollHeight - window.innerHeight; }
-  if (max <= 8) { up.style.display = "none"; down.style.display = "none"; return; }
-  up.style.display = y > 8 ? "flex" : "none";
-  down.style.display = y < max - 8 ? "flex" : "none";
+  if (max <= 8) { setDisp(up, "none"); setDisp(down, "none"); return; }
+  setDisp(up, y > 8 ? "flex" : "none");
+  setDisp(down, y < max - 8 ? "flex" : "none");
 }
 function vGo(dir) {
   const sc = vScroller();
@@ -795,6 +796,15 @@ function bindVScroll() {
   const panel = $("overlay-panel");
   if (panel) panel.addEventListener("scroll", vState, { passive: true });
   window.addEventListener("resize", vMeasure);
+  // re-measure when content changes (switch list, battle log, shop/dex renders…)
+  let vmoT = null;
+  try {
+    const app = $("app");
+    if (app && typeof MutationObserver === "function") {
+      new MutationObserver(() => { clearTimeout(vmoT); vmoT = setTimeout(vMeasure, 160); })
+        .observe(app, { childList: true, subtree: true, characterData: true });
+    }
+  } catch (e) {}
   setTimeout(vMeasure, 120);
   setTimeout(vMeasure, 800);
 }
