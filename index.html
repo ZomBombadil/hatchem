@@ -66,6 +66,8 @@
   .grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; }
   .slot { background:#fffdf5; border:3px solid #ffd166; border-radius:16px; padding:6px; text-align:center; cursor:pointer; min-height:120px; }
   .slot.sel { border-color:#ff6b6b; box-shadow:0 0 0 3px #ff6b6b55; }
+  .slot.fuse-sel { border-color:#9a6ff0; box-shadow:0 0 0 3px #9a6ff055; }
+  .tmode.on { outline:3px solid #7a5c3e; }
   .slot:focus-visible { outline:3px solid #ff6b6b; outline-offset:2px; }
   .slot canvas { width:100%; height:auto; }
   .slot .nm { font-size:13px; font-weight:bold; }
@@ -134,7 +136,7 @@
     <div class="subtitle">Hatch eggs. Meet monsters.<br>Become the greatest Hatcher ever!</div>
     <div class="center"><div class="big-egg">🥚</div></div>
     <button class="btn pink" id="btn-start">▶ Tap to Start!</button>
-    <div class="center timer">A wholesome game for the whole family 💛<br>v1.3 — works fully offline</div>
+    <div class="center timer">A wholesome game for the whole family 💛<br>v1.4 — works fully offline</div>
     <div class="card center" style="margin-top:14px">
       <button class="btn small gray" id="btn-mute-title">🔊 Sound: On</button>
     </div>
@@ -184,7 +186,20 @@
   <!-- TEAM -->
   <section class="screen" id="scr-team">
     <h2 class="center">🐾 My Team</h2>
-    <div class="subtitle">Tap monsters to put them in your battle team (3 max).</div>
+    <div class="subtitle" id="team-mode-hint">Tap monsters to put them in your battle team (3 max).</div>
+    <div class="row center" style="gap:8px;margin-bottom:6px">
+      <button class="btn small tmode" data-tm="team">⭐ Team</button>
+      <button class="btn small tmode" data-tm="sell">💰 Sell</button>
+      <button class="btn small tmode" data-tm="fuse">🔀 Fuse</button>
+    </div>
+    <div id="fuse-bar" class="hidden card center" style="margin-bottom:8px">
+      <b>🔀 <span id="fuse-count">0</span> selected</b><br>
+      <span style="font-size:12px">Fuse 2+ duplicates of the same species:<br>evolves one stage, or grants levels at max stage.</span><br>
+      <div class="row center" style="gap:8px;margin-top:6px">
+        <button class="btn pink" id="btn-fuse-go">Fuse!</button>
+        <button class="btn small gray" id="btn-fuse-clear">Clear</button>
+      </div>
+    </div>
     <h3>⭐ Battle Team</h3>
     <div class="grid" id="team-slots"></div>
     <h3>🎒 Collection (<span id="team-count"></span>)</h3>
@@ -271,7 +286,7 @@
 </div>
 <script>
 "use strict";
-/* ================= Hatchem! v1.3 — a wholesome monster hatching game ================ */
+/* ================= Hatchem! v1.4 — a wholesome monster hatching game ================ */
 const $ = id => document.getElementById(id);
 const rnd = (a,b) => a + Math.random()*(b-a);
 const ri = (a,b) => Math.floor(rnd(a,b+1));
@@ -1019,7 +1034,78 @@ function renderDex() {
   }
 }
 /* ================= TEAM ================= */
+let teamMode = "team"; // team | sell | fuse
+let fuseSel = new Set();
+const SELL_BASE = { common:15, rare:40, epic:100, legendary:250, mythic:600 };
+function sellPrice(m) { return (SELL_BASE[monSpecies(m).rarity] || 10) + m.level * 3; }
+function sellMonster(uid) {
+  const m = S.monsters.find(x => x.uid === uid);
+  if (!m) return;
+  if (S.monsters.length <= 1) {
+    overlay(`<h3>💰 Can't sell</h3><p>You need to keep at least one hatchling!</p><button class="btn" onclick="closeOverlay()">OK</button>`);
+    return;
+  }
+  const sp = monSpecies(m), price = sellPrice(m);
+  overlay(`<h3>💰 Sell ${sp.name}?</h3><p>Lv ${m.level} ${rarityBadge(sp.rarity)}<br>Sell for <b>🪙${price}</b>?</p>
+    <div class="row center" style="gap:8px"><button class="btn green" id="sell-yes">Sell!</button>
+    <button class="btn gray" onclick="closeOverlay()">Keep</button></div>`);
+  $("sell-yes").onclick = () => {
+    sfx.coin();
+    S.monsters = S.monsters.filter(x => x.uid !== uid);
+    S.team = S.team.filter(t => t !== uid);
+    if (!S.team.length && S.monsters.length) S.team = [S.monsters[0].uid];
+    S.coins += price;
+    save(); closeOverlay(); renderTeam(); refreshTop();
+  };
+}
+function fuseMonsters() {
+  const sel = [...fuseSel].map(uid => S.monsters.find(x => x.uid === uid)).filter(Boolean);
+  if (sel.length < 2) return;
+  const sp = monSpecies(sel[0]);
+  sel.sort((a, b) => b.level - a.level);
+  const base = sel[0], consumed = sel.slice(1);
+  const gone = new Set(consumed.map(m => m.uid));
+  S.monsters = S.monsters.filter(m => !gone.has(m.uid));
+  S.team = S.team.filter(t => !gone.has(t));
+  if (!S.team.length && S.monsters.length) S.team = [base.uid]; // never strand the team
+  let msg;
+  if (sp.evo) {
+    const from = sp.name;
+    base.species = sp.evo.to;
+    base.hp = monStats(base).hp;
+    S.dexSeen[base.species] = true;
+    msg = `✨ ${from} absorbed ${consumed.length} duplicate${consumed.length > 1 ? "s" : ""} and evolved into <b>${monSpecies(base).name}</b>!`;
+    try { sfx.evolve(); } catch (e) {}
+  } else {
+    const before = base.level;
+    consumed.forEach(() => gainXP(base, xpNext(base.level)));
+    const lv = base.level - before;
+    msg = `💪 ${sp.name} absorbed ${consumed.length} duplicate${consumed.length > 1 ? "s" : ""} and gained <b>${lv} level${lv === 1 ? "" : "s"}</b>!`;
+    try { sfx.fanfare(); } catch (e) {}
+  }
+  fuseSel.clear();
+  save(); renderTeam(); refreshTop();
+  overlay(`<h3>🔀 Fusion!</h3><p>${msg}</p><button class="btn" onclick="closeOverlay()">Awesome!</button>`);
+}
 function renderTeam() {
+  // mode toggle
+  document.querySelectorAll(".tmode").forEach(b => {
+    b.classList.toggle("on", b.dataset.tm === teamMode);
+    b.onclick = () => { sfx.tap(); teamMode = b.dataset.tm; fuseSel.clear(); save(); renderTeam(); };
+  });
+  const hints = {
+    team: "Tap monsters to put them in your battle team (3 max).",
+    sell: "💰 Tap a monster to sell it for coins.",
+    fuse: "🔀 Tap 2+ duplicates of the same species, then Fuse!"
+  };
+  $("team-mode-hint").textContent = hints[teamMode];
+  const fb = $("fuse-bar");
+  if (teamMode === "fuse" && fuseSel.size > 0) {
+    fb.classList.remove("hidden");
+    $("fuse-count").textContent = fuseSel.size;
+    $("btn-fuse-go").onclick = () => fuseMonsters();
+    $("btn-fuse-clear").onclick = () => { fuseSel.clear(); renderTeam(); };
+  } else fb.classList.add("hidden");
   const ts = $("team-slots"); ts.innerHTML = "";
   for (let i=0;i<3;i++) {
     const uid = S.team[i], m = S.monsters.find(x => x.uid === uid);
@@ -1034,14 +1120,31 @@ function renderTeam() {
   const sorted = [...S.monsters].sort((a,b)=> RARITY_ORDER.indexOf(monSpecies(b).rarity) - RARITY_ORDER.indexOf(monSpecies(a).rarity) || b.level - a.level);
   sorted.forEach(m => {
     const sp = monSpecies(m);
-    const d = document.createElement("div"); d.className = "slot" + (S.team.includes(m.uid)?" sel":"");
-    const c = document.createElement("canvas"); c.width=c.height=96; portrait(c, sp, {});
+    const d = document.createElement("div");
+    d.className = "slot" + (S.team.includes(m.uid) ? " sel" : "") + (fuseSel.has(m.uid) ? " fuse-sel" : "");
+    const c = document.createElement("canvas"); c.width = c.height = 96; portrait(c, sp, {});
     d.appendChild(c);
-    d.insertAdjacentHTML("beforeend", `<div class="nm">${sp.name}</div><div style="font-size:11px">Lv ${m.level} ${rarityBadge(sp.rarity)}</div>`);
+    const extra = teamMode === "sell" ? `<div style="font-size:11px;color:#8a6d1b">💰 ${sellPrice(m)}</div>`
+      : `<div style="font-size:11px">Lv ${m.level} ${rarityBadge(sp.rarity)}</div>`;
+    d.insertAdjacentHTML("beforeend", `<div class="nm">${sp.name}</div>${extra}`);
     d.onclick = () => {
       sfx.tap();
+      if (teamMode === "sell") { sellMonster(m.uid); return; }
+      if (teamMode === "fuse") {
+        if (fuseSel.has(m.uid)) fuseSel.delete(m.uid);
+        else {
+          const first = S.monsters.find(x => x.uid === [...fuseSel][0]);
+          if (first && monSpecies(first).id !== sp.id) {
+            overlay(`<h3>🔀 Fuse</h3><p>Only duplicates of the <b>same species</b> can fuse!<br>Currently selecting: ${monSpecies(first).name}</p><button class="btn" onclick="closeOverlay()">OK</button>`);
+            return;
+          }
+          fuseSel.add(m.uid);
+        }
+        renderTeam();
+        return;
+      }
       const ix = S.team.indexOf(m.uid);
-      if (ix >= 0) { if (S.team.length > 1) S.team.splice(ix,1); }
+      if (ix >= 0) { if (S.team.length > 1) S.team.splice(ix, 1); }
       else { if (S.team.length < 3) S.team.push(m.uid); else { S.team.shift(); S.team.push(m.uid); } }
       save(); renderTeam(); refreshTop();
     };
