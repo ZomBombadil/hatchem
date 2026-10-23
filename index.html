@@ -76,6 +76,16 @@
     padding:10px 2px 12px; color:#7a5c3e; cursor:pointer; }
   #navbar button .ico { font-size:24px; display:block; }
   #navbar button.on { color:#ff6b6b; }
+  /* maneuver buttons: vertical scroll for all tabs + overlay (frames that
+     swallow touch panning, e.g. itch.io fullscreen). Only visible when the
+     active context actually scrolls; ▲ hides at top, ▼ hides at bottom. */
+  .vscroll-btn { position:fixed; z-index:60; right:6px; width:38px; height:46px; display:none;
+    align-items:center; justify-content:center; font-size:17px; font-weight:bold;
+    font-family:inherit; color:#7a5c3e; background:rgba(255,253,245,.9);
+    border:2px solid #ffd166; border-radius:11px; cursor:pointer; user-select:none; }
+  #vUp { top:calc(50% - 54px); }
+  #vDown { top:calc(50% + 8px); }
+  .vscroll-btn:active { transform:scale(.92); background:#ffe9a8; }
   /* overlay */
   #overlay { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center;
     background:rgba(40,25,60,.72); padding:16px; }
@@ -238,6 +248,8 @@
   </nav>
 
   <div id="overlay"><div class="panel" id="overlay-panel"></div></div>
+  <button id="vUp" class="vscroll-btn" aria-label="Scroll up">▲</button>
+  <button id="vDown" class="vscroll-btn" aria-label="Scroll down">▼</button>
 </div>
 <script>
 "use strict";
@@ -736,9 +748,56 @@ function show(id) {
   document.querySelectorAll("#navbar button").forEach(b =>
     b.classList.toggle("on", b.dataset.scr === id));
   window.scrollTo(0,0);
+  setTimeout(vMeasure, 60);
 }
-function overlay(html) { $("overlay-panel").innerHTML = html; $("overlay").classList.add("show"); }
-function closeOverlay() { $("overlay").classList.remove("show"); }
+function overlay(html) { $("overlay-panel").innerHTML = html; $("overlay").classList.add("show"); vMeasure(); setTimeout(vMeasure, 300); }
+function closeOverlay() { $("overlay").classList.remove("show"); vMeasure(); }
+
+/* ---------- vertical maneuver buttons (▲ ▼) ----------
+   Scroll the overlay panel when it's open and scrollable, otherwise
+   the document. For embedded frames that swallow touch panning. */
+function vScroller() {
+  const ov = $("overlay"), panel = $("overlay-panel");
+  if (ov && panel && ov.classList.contains("show") && panel.scrollHeight > panel.clientHeight + 8) return panel;
+  return null;
+}
+function vMeasure() {
+  const up = $("vUp"), down = $("vDown");
+  if (!up || !down) return;
+  const sc = vScroller();
+  const max = sc ? sc.scrollHeight - sc.clientHeight
+                 : document.documentElement.scrollHeight - window.innerHeight;
+  if (max <= 8) { up.style.display = "none"; down.style.display = "none"; return; }
+  vState();
+}
+function vState() {
+  const up = $("vUp"), down = $("vDown");
+  if (!up || !down) return;
+  const sc = vScroller();
+  let y, max;
+  if (sc) { y = sc.scrollTop; max = sc.scrollHeight - sc.clientHeight; }
+  else { y = window.scrollY || document.documentElement.scrollTop || 0;
+         max = document.documentElement.scrollHeight - window.innerHeight; }
+  if (max <= 8) { up.style.display = "none"; down.style.display = "none"; return; }
+  up.style.display = y > 8 ? "flex" : "none";
+  down.style.display = y < max - 8 ? "flex" : "none";
+}
+function vGo(dir) {
+  const sc = vScroller();
+  const amt = Math.round((sc ? sc.clientHeight : window.innerHeight) * 0.8) * dir;
+  if (sc) sc.scrollBy({ top: amt, behavior: "smooth" });
+  else window.scrollBy({ top: amt, behavior: "smooth" });
+}
+function bindVScroll() {
+  $("vUp").onclick = () => { sfx.tap(); vGo(-1); };
+  $("vDown").onclick = () => { sfx.tap(); vGo(1); };
+  window.addEventListener("scroll", vState, { passive: true });
+  const panel = $("overlay-panel");
+  if (panel) panel.addEventListener("scroll", vState, { passive: true });
+  window.addEventListener("resize", vMeasure);
+  setTimeout(vMeasure, 120);
+  setTimeout(vMeasure, 800);
+}
 function elemBadge(el) { return el ? `<span class="elem e-${el}">${ELEMOJI[el]} ${el}</span>` : `<span class="elem">✋ Nibble</span>`; }
 function rarityBadge(r) { return `<span class="badge b-${r}">${r.toUpperCase()}</span>`; }
 function refreshTop() {
@@ -1226,6 +1285,7 @@ function init() {
       refreshTop();
     };
   });
+  bindVScroll();
   $("btn-start").onclick = () => {
     sfx.tap(); audio();
     if (!S.started) {
