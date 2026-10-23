@@ -66,6 +66,7 @@
   .grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; }
   .slot { background:#fffdf5; border:3px solid #ffd166; border-radius:16px; padding:6px; text-align:center; cursor:pointer; min-height:120px; }
   .slot.sel { border-color:#ff6b6b; box-shadow:0 0 0 3px #ff6b6b55; }
+  .slot:focus-visible { outline:3px solid #ff6b6b; outline-offset:2px; }
   .slot canvas { width:100%; height:auto; }
   .slot .nm { font-size:13px; font-weight:bold; }
   /* navbar */
@@ -669,6 +670,7 @@ function rollSpecies(rarity) {
   const pool = SPECIES.filter(s => s.rarity === rarity);
   return pick(pool).id;
 }
+let hatching = false; // module-level double-ceremony guard (not saved)
 function doHatch() {
   if (!S.eggs.length) return null;
   S.eggs.shift();
@@ -790,11 +792,15 @@ function renderEggs() {
     d.appendChild(c);
     d.insertAdjacentHTML("beforeend", `<div class="nm">Mystery Egg</div><div style="font-size:12px">Tap to hatch!</div>`);
     d.onclick = () => hatchCeremony(i);
+    // D-pad / keyboard operability (Fire TV Silk has no touch)
+    d.tabIndex = 0; d.setAttribute("role", "button"); d.setAttribute("aria-label", "Hatch mystery egg");
+    d.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hatchCeremony(i); } };
     g.appendChild(d);
   });
 }
 function hatchCeremony(eggIndex) {
-  if (!S.eggs.length) return;
+  if (hatching || !S.eggs.length) return;
+  hatching = true; // guard: D-pad repeat / double-tap must not start two ceremonies
   sfx.tap();
   overlay(`<h2>Get ready…</h2><canvas class="stage" id="hatch-cv" width="340" height="340"></canvas>
     <div id="hatch-msg" style="font-size:20px;min-height:30px">Something is stirring inside! 🥚</div>`);
@@ -813,7 +819,7 @@ function hatchCeremony(eggIndex) {
     if (t >= 34) {
       clearInterval(iv);
       const res = doHatch();
-      if (!res) { closeOverlay(); return; }
+      if (!res) { hatching = false; closeOverlay(); return; }
       const { monster:m, rarity, isNew } = res;
       const sp = monSpecies(m);
       // flash + reveal
@@ -831,9 +837,13 @@ function hatchCeremony(eggIndex) {
           <div>${elemBadge(sp.element)}</div>
           <p style="font-size:15px"><i>"${sp.desc}"</i></p>
           ${isNew?`<p>📖 New Hatchidex entry! (${dexPct()}%)</p>`:""}
-          <button class="btn green" onclick="closeOverlay();sfx.tap()">Yay! 💛</button></div>`);
+          <button class="btn green" id="yay-btn" onclick="closeOverlay();renderEggs();refreshTop();sfx.tap()">Yay! 💛</button></div>`);
         portrait($("rev-cv"), sp, {});
         refreshTop();
+        hatching = false;
+        // D-pad / keyboard: move focus to the dismiss button so Enter/Space works
+        // even when the TV browser never moves focus into the fresh overlay.
+        const yb = $("yay-btn"); if (yb) yb.focus();
       }, 450);
     }
   }, 90);
@@ -1225,6 +1235,7 @@ function init() {
         <p>Your <b>first hatch is extra lucky</b>… ✨</p>
         <button class="btn pink" id="w-ok">Let's go!</button>`);
       $("w-ok").onclick = () => { sfx.tap(); closeOverlay(); show("scr-eggs"); renderEggs(); refreshTop(); };
+      $("w-ok").focus(); // D-pad users land on the button immediately
     } else { show("scr-home"); renderHome(); }
     refreshTop();
   };
@@ -1244,6 +1255,15 @@ function init() {
   $("btn-mute-title").onclick = toggleMute;
   $("btn-newgame").onclick = newGame;
   $("overlay").addEventListener("click", e => { if (e.target.id === "overlay") { /* keep modal */ } });
+  // D-pad / keyboard escape hatch: if a modal overlay is up and its primary
+  // button isn't focused (TV browsers often don't move focus into fresh
+  // overlays), Enter / Space / Escape activates it instead of stranding the user.
+  document.addEventListener("keydown", e => {
+    if (!$("overlay").classList.contains("show")) return;
+    if (e.key !== "Enter" && e.key !== " " && e.key !== "Escape") return;
+    const pb = document.querySelector("#overlay-panel #yay-btn, #overlay-panel #w-ok");
+    if (pb && document.activeElement !== pb) { e.preventDefault(); pb.click(); }
+  });
   updateMuteBtns();
   show("scr-title");
   refreshTop();
