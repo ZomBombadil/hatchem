@@ -76,6 +76,17 @@
     padding:10px 2px 12px; color:#7a5c3e; cursor:pointer; }
   #navbar button .ico { font-size:24px; display:block; }
   #navbar button.on { color:#ff6b6b; }
+  /* floating damage numbers — appear over whichever monster got hit */
+  .dmgpop { position:absolute; right:14px; top:32%; font-size:36px; font-weight:bold;
+    color:#e63946; text-shadow:2px 2px 0 #fff,-2px -2px 0 #fff,2px -2px 0 #fff,-2px 2px 0 #fff;
+    pointer-events:none; z-index:5; animation:dmgpop .95s ease-out forwards; }
+  @keyframes dmgpop { 0% { transform:translateY(8px) scale(.5); opacity:0; }
+    18% { opacity:1; transform:translateY(0) scale(1.2); }
+    100% { transform:translateY(-52px) scale(1); opacity:0; } }
+  .tag-wild, .tag-you { font-size:10px; font-weight:bold; letter-spacing:1px;
+    border-radius:8px; padding:2px 8px; margin-left:6px; white-space:nowrap; }
+  .tag-wild { background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; }
+  .tag-you { background:#fff8e1; color:#8a6d1b; border:1px solid #ffd166; }
   /* maneuver buttons: vertical scroll for all tabs + overlay (frames that
      swallow touch panning, e.g. itch.io fullscreen). Only visible when the
      active context actually scrolls; ▲ hides at top, ▼ hides at bottom. */
@@ -189,7 +200,7 @@
   <section class="screen" id="scr-battle">
     <div class="card">
       <div class="row" style="justify-content:space-between">
-        <div><b id="b-ename"></b> <span id="b-elvl"></span> <span id="b-eelem"></span></div>
+        <div><b id="b-ename"></b> <span id="b-elvl"></span> <span id="b-eelem"></span><span class="tag-wild">🌿 WILD</span></div>
         <div id="b-eballs"></div>
       </div>
       <div class="row"><canvas id="b-ecanv" width="160" height="160" style="width:110px;height:110px"></canvas>
@@ -199,7 +210,7 @@
     <div id="blog">A wild battle begins!</div>
     <div class="card">
       <div class="row" style="justify-content:space-between">
-        <div><b id="b-pname"></b> <span id="b-plvl"></span> <span id="b-pelem"></span></div>
+        <div><b id="b-pname"></b> <span id="b-plvl"></span> <span id="b-pelem"></span><span class="tag-you">💛 YOU</span></div>
         <div id="b-pballs"></div>
       </div>
       <div class="row"><canvas id="b-pcanv" width="160" height="160" style="width:110px;height:110px"></canvas>
@@ -1123,6 +1134,18 @@ function calcDamage(att, def, move) {
 function doAttack(att, def, move, attIsPlayer, cb) {
   const { dmg, mult } = calcDamage(att, def, move);
   def.hp = Math.max(0, def.hp - dmg);
+  // floating damage number over whoever actually got hit — unmistakable
+  try {
+    const cards = document.querySelectorAll("#scr-battle .card");
+    const card = cards[attIsPlayer ? 0 : 1]; // enemy card is first, yours second
+    if (card) {
+      card.style.position = "relative";
+      const pop = document.createElement("div");
+      pop.className = "dmgpop"; pop.textContent = "-" + dmg;
+      card.appendChild(pop);
+      setTimeout(() => pop.remove(), 1100);
+    }
+  } catch (e) {}
   if (mult > 1) sfx.superhit(); else if (mult < 1) sfx.weak(); else sfx.hit();
   const an = monSpecies(att).name, dn = monSpecies(def).name;
   $("blog").textContent = `${an} used ${move.name}! ${matchText(mult)} (-${dmg})`;
