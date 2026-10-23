@@ -83,6 +83,9 @@
   @keyframes dmgpop { 0% { transform:translateY(8px) scale(.5); opacity:0; }
     18% { opacity:1; transform:translateY(0) scale(1.2); }
     100% { transform:translateY(-52px) scale(1); opacity:0; } }
+  .dmgpop.heal { color:#22c55e; }
+  .movegrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+  .movegrid .movebtn { margin:0; }
   .tag-wild, .tag-you { font-size:10px; font-weight:bold; letter-spacing:1px;
     border-radius:8px; padding:2px 8px; margin-left:6px; white-space:nowrap; }
   .tag-wild { background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; }
@@ -219,8 +222,12 @@
       </div>
     </div>
     <div id="b-controls">
-      <button class="btn movebtn" id="b-m1"></button>
-      <button class="btn movebtn blue" id="b-m2"></button>
+      <div class="movegrid">
+        <button class="btn movebtn" id="b-m1"></button>
+        <button class="btn movebtn blue" id="b-m2"></button>
+        <button class="btn movebtn pink" id="b-m3"></button>
+        <button class="btn movebtn purple" id="b-m4"></button>
+      </div>
       <div class="row"><button class="btn small green" id="b-switch" style="flex:1">🔄 Switch</button>
       <button class="btn small gray" id="b-run" style="flex:1">🏃 Run</button></div>
     </div>
@@ -303,7 +310,54 @@ const sfx = {
 /* cycle: snack>splash>frost>spice>volt>cosmic>snack */
 const ELEMENTS = ["snack","splash","frost","spice","volt","cosmic"];
 const ELEMOJI = { snack:"🍪", spice:"🌶️", frost:"❄️", volt:"⚡", splash:"💧", cosmic:"🌌" };
-const ELEMV = { snack:"Snack Attack", splash:"Splash Plop", frost:"Frosty Nibble", spice:"Spicy Sizzle", volt:"Volt Zap", cosmic:"Cosmic Crunch" };
+/* ============ MOVES: 4 per monster, type-flavored ============
+   Slot 1: reliable neutral poke. Slot 2: same-type STAB. Slot 3: heavy
+   same-type hit (big power, shaky accuracy). Slot 4: trick — a utility
+   move whose variables (buff / debuff / heal / priority) are tuned per
+   element to answer that element's counters. */
+const ELEMENT_MOVES = {
+  snack: [
+    { name:"Snack Attack", power:65, acc:100 },
+    { name:"Crumb Cannon", power:92, acc:85 },
+    { name:"Caramel Coat", power:0, acc:100, self:{ shield:true } },
+  ],
+  splash: [
+    { name:"Splash Plop", power:65, acc:100 },
+    { name:"Tidal Slam", power:92, acc:85 },
+    { name:"Healing Rain", power:0, acc:100, self:{ heal:0.30 } },
+  ],
+  frost: [
+    { name:"Frosty Nibble", power:65, acc:100 },
+    { name:"Glacier Crash", power:92, acc:85 },
+    { name:"Frostbite", power:65, acc:95, drain:0.5 },
+  ],
+  spice: [
+    { name:"Spicy Sizzle", power:65, acc:100 },
+    { name:"Inferno Bite", power:92, acc:85 },
+    { name:"Kindling", power:0, acc:100, self:{ atk:1 } },
+  ],
+  volt: [
+    { name:"Volt Zap", power:65, acc:100 },
+    { name:"Thunder Chomp", power:92, acc:85 },
+    { name:"Quick Jolt", power:55, acc:100, priority:1 },
+  ],
+  cosmic: [
+    { name:"Cosmic Crunch", power:65, acc:100 },
+    { name:"Meteor Mash", power:92, acc:85 },
+    { name:"Event Horizon", power:70, acc:90, drain:0.5 },
+  ],
+};
+function monMoves(m) {
+  const el = monSpecies(m).element;
+  const em = ELEMENT_MOVES[el] || ELEMENT_MOVES.snack;
+  const withEl = mv => Object.assign({ element: el }, mv);
+  return [
+    { name:"Nibble", element:null, power:40, acc:100 },
+    withEl(em[0]), withEl(em[1]), withEl(em[2]),
+  ];
+}
+/* stat stages: -3..+3, classic multipliers; reset every battle */
+function stageMult(s) { return s >= 0 ? (2 + s) / 2 : 2 / (2 - s); }
 function matchup(atk, def) {
   if (!atk || !def) return 1;
   const i = ELEMENTS.indexOf(atk), j = ELEMENTS.indexOf(def);
@@ -652,10 +706,12 @@ function makeMonster(speciesId, level=1) {
 function monSpecies(m) { return SP_BY_ID[m.species]; }
 function monStats(m) { return statsFor(monSpecies(m), m.level); }
 function monMoves(m) {
-  const sp = monSpecies(m);
+  const el = monSpecies(m).element;
+  const em = ELEMENT_MOVES[el] || ELEMENT_MOVES.snack;
+  const withEl = mv => Object.assign({ element: el }, mv);
   return [
-    { name: "Nibble", element: null, power: 40 },
-    { name: ELEMV[sp.element], element: sp.element, power: 65 },
+    { name:"Nibble", element:null, power:40, acc:100 },
+    withEl(em[0]), withEl(em[1]), withEl(em[2]),
   ];
 }
 function gainXP(m, amount) {
@@ -1088,7 +1144,9 @@ function startBattle(mode, trainerIdx=-1) {
     title = `${t.name} wants to battle! 🏆`;
   }
   B = { mode, trainerIdx, pteam, eteam, pIdx: 0, eIdx: 0, busy: false, over: false,
-        participants: new Set([pteam[0].uid]), title };
+        participants: new Set([pteam[0].uid]), title,
+        stages: { p:{ atk:0, def:0, spd:0 }, e:{ atk:0, def:0, spd:0 } },
+        shield: { p:false, e:false } };
   $("b-run").style.display = mode === "wild" ? "" : "none";
   show("scr-battle");
   $("blog").textContent = title;
@@ -1117,38 +1175,124 @@ function updateBattleUI() {
   const mv = monMoves(p);
   mv.forEach((m,i) => {
     const btn = $("b-m"+(i+1));
-    const eff = m.element ? matchup(m.element, es.element) : 1;
+    if (!btn) return;
+    const eff = (m.element && m.power) ? matchup(m.element, es.element) : 1;
     const hint = eff > 1 ? " ✨" : eff < 1 ? " 💧" : "";
-    btn.innerHTML = `${m.name}${hint}<br><span class="tag">${m.element?ELEMOJI[m.element]+" "+m.element:"neutral"} · pow ${m.power}</span>`;
+    const elTag = m.element ? ELEMOJI[m.element]+" "+m.element : "neutral";
+    let sub;
+    if (m.power) {
+      sub = `${elTag} · pow ${m.power}${m.acc < 100 ? ` · ${m.acc}%` : ""}${m.priority ? " · ⚡first" : ""}${m.drain ? " · 🩸drain" : ""}`;
+    } else if (m.self && m.self.heal) {
+      sub = `${elTag} · 💚 heal ${Math.round(m.self.heal*100)}%`;
+    } else if (m.self && m.self.shield) {
+      sub = `${elTag} · 🛡️ halve damage`;
+    } else if (m.self) {
+      const k = Object.keys(m.self)[0];
+      sub = `${elTag} · ↑ own ${k.toUpperCase()}`;
+    } else if (m.foe) {
+      const k = Object.keys(m.foe)[0];
+      sub = `${elTag} · ↓ foe ${k.toUpperCase()}`;
+    } else sub = elTag;
+    btn.innerHTML = `${m.name}${hint}<br><span class="tag">${sub}</span>`;
     btn.disabled = B.busy || B.over;
   });
   $("b-switch").disabled = B.busy || B.over;
   $("b-switchlist").classList.add("hidden");
 }
-function calcDamage(att, def, move) {
+function calcDamage(att, def, move, side, fside) {
   const as = monStats(att), ds = monStats(def);
+  const atk = as.atk * stageMult(B.stages[side].atk);
+  const dfn = ds.def * stageMult(B.stages[fside].def);
   const stab = (move.element && move.element === monSpecies(att).element) ? 1.4 : 1;
   const mult = matchup(move.element, monSpecies(def).element);
-  return { dmg: Math.max(1, Math.floor(move.power * (as.atk/(ds.def+8)) * (1+att.level/60) * stab * mult * rnd(0.85,1))), mult };
+  let dmg = Math.max(1, Math.floor(move.power * (atk/(dfn+8)) * (1+att.level/60) * stab * mult * rnd(0.85,1)));
+  const shielded = B.shield[fside];
+  if (shielded) dmg = Math.max(1, Math.floor(dmg / 2)); // caramel coat: halved incoming
+  return { dmg, mult, shielded };
+}
+function applyTrick(att, def, move, side, fside) {
+  const an = monSpecies(att).name, dn = monSpecies(def).name;
+  const msgs = [];
+  if (move.self) {
+    for (const k of ["atk","def","spd"]) if (move.self[k]) {
+      B.stages[side][k] = clamp(B.stages[side][k] + move.self[k], -3, 3);
+      msgs.push(`${an}'s ${k.toUpperCase()} ${move.self[k] > 0 ? "rose" : "fell"}!`);
+    }
+    if (move.self.heal) {
+      const st = monStats(att), amt = Math.ceil(st.hp * move.self.heal);
+      att.hp = Math.min(st.hp, att.hp + amt);
+      msgs.push(`${an} healed ${amt} HP! 💚`);
+    }
+    if (move.self.shield) {
+      B.shield[side] = true;
+      msgs.push(`${an} is coated in caramel — incoming damage halved! 🛡️`);
+    }
+  }
+  if (move.foe) {
+    for (const k of ["atk","def","spd"]) if (move.foe[k]) {
+      B.stages[fside][k] = clamp(B.stages[fside][k] + move.foe[k], -3, 3);
+      msgs.push(`${dn}'s ${k.toUpperCase()} ${move.foe[k] > 0 ? "rose" : "fell"}!`);
+    }
+  }
+  $("blog").textContent = `${an} used ${move.name}! ${msgs.join(" ")}`;
+  try { sfx.heal(); } catch (e) {}
 }
 function doAttack(att, def, move, attIsPlayer, cb) {
-  const { dmg, mult } = calcDamage(att, def, move);
+  const side = attIsPlayer ? "p" : "e", fside = attIsPlayer ? "e" : "p";
+  const an = monSpecies(att).name, dn = monSpecies(def).name;
+  // accuracy check — heavy hitters can miss
+  if ((move.acc || 100) < 100 && Math.random() * 100 >= move.acc) {
+    $("blog").textContent = `${an} used ${move.name}! It missed! 💨`;
+    updateBattleUI();
+    setTimeout(cb, 800);
+    return;
+  }
+  // trick moves: no damage, apply buff/debuff/heal
+  if (!move.power) {
+    applyTrick(att, def, move, side, fside);
+    updateBattleUI();
+    setTimeout(cb, 800);
+    return;
+  }
+  const { dmg, mult, shielded } = calcDamage(att, def, move, side, fside);
   def.hp = Math.max(0, def.hp - dmg);
+  let extraMsg = "";
+  if (shielded) { // shield breaks after softening one hit
+    B.shield[fside] = false;
+    extraMsg = " 🛡️ The caramel coat softened the blow!";
+  }
+  // lifesteal: drain a share of damage dealt back as HP
+  let drained = 0;
+  if (move.drain && dmg > 0 && att.hp > 0) {
+    const st = monStats(att);
+    drained = Math.min(Math.floor(dmg * move.drain), st.hp - att.hp);
+    if (drained > 0) att.hp += drained;
+  }
   // floating damage number over whoever actually got hit — unmistakable
   try {
     const cards = document.querySelectorAll("#scr-battle .card");
-    const card = cards[attIsPlayer ? 0 : 1]; // enemy card is first, yours second
-    if (card) {
-      card.style.position = "relative";
+    const hitCard = cards[attIsPlayer ? 0 : 1]; // enemy card is first, yours second
+    if (hitCard) {
+      hitCard.style.position = "relative";
       const pop = document.createElement("div");
       pop.className = "dmgpop"; pop.textContent = "-" + dmg;
-      card.appendChild(pop);
+      hitCard.appendChild(pop);
       setTimeout(() => pop.remove(), 1100);
+    }
+    if (drained > 0) { // green lifesteal number over the attacker
+      const atkCard = cards[attIsPlayer ? 1 : 0];
+      if (atkCard) {
+        atkCard.style.position = "relative";
+        const gp = document.createElement("div");
+        gp.className = "dmgpop heal"; gp.textContent = "+" + drained;
+        atkCard.appendChild(gp);
+        setTimeout(() => gp.remove(), 1100);
+      }
     }
   } catch (e) {}
   if (mult > 1) sfx.superhit(); else if (mult < 1) sfx.weak(); else sfx.hit();
-  const an = monSpecies(att).name, dn = monSpecies(def).name;
-  $("blog").textContent = `${an} used ${move.name}! ${matchText(mult)} (-${dmg})`;
+  const drainMsg = drained > 0 ? ` 🩸 Drained +${drained} HP!` : "";
+  $("blog").textContent = `${an} used ${move.name}! ${matchText(mult)} (-${dmg})${drainMsg}${extraMsg}`;
   updateBattleUI();
   setTimeout(() => {
     if (def.hp <= 0) {
@@ -1159,16 +1303,40 @@ function doAttack(att, def, move, attIsPlayer, cb) {
 }
 function enemyMove() {
   const e = curE(), p = curP();
-  const mv = monMoves(e);
-  const good = matchup(mv[1].element, monSpecies(p).element) >= 1;
-  return (good && Math.random() < 0.75) || Math.random() < 0.4 ? mv[1] : mv[0];
+  const mvs = monMoves(e);
+  const est = monStats(e);
+  // heal up when hurt and able
+  const healTrick = mvs.find(m => m.self && m.self.heal);
+  if (healTrick && e.hp < est.hp * 0.35 && Math.random() < 0.6) return healTrick;
+  // shield up when badly hurt and able
+  const shieldTrick = mvs.find(m => m.self && m.self.shield);
+  if (shieldTrick && !B.shield.e && e.hp < est.hp * 0.5 && Math.random() < 0.4) return shieldTrick;
+  // otherwise pick the hardest-hitting option by matchup x power x accuracy
+  const damagers = mvs.filter(m => (m.power || 0) > 0);
+  let best = damagers[0], bestScore = -1;
+  for (const m of damagers) {
+    const score = matchup(m.element, monSpecies(p).element) * m.power * ((m.acc || 100) / 100)
+      + (m.drain ? 12 : 0) + (m.priority ? 6 : 0);
+    if (score > bestScore) { bestScore = score; best = m; }
+  }
+  if (Math.random() < 0.72) return best;
+  // sometimes get creative: buff, debuff, or an off-pick
+  const tricks = mvs.filter(m => !m.power);
+  if (tricks.length && Math.random() < 0.35) return tricks[Math.floor(Math.random() * tricks.length)];
+  return damagers[Math.floor(Math.random() * damagers.length)];
 }
 function playerMove(i) {
   if (!B || B.busy || B.over) return;
   sfx.tap(); B.busy = true; updateBattleUI();
   const p = curP(), e = curE(), mv = monMoves(p)[i];
-  const pFirst = monStats(p).spd >= monStats(e).spd;
+  const eMv = enemyMove();
+  // priority goes first; then speed (with stat stages)
+  const pPr = mv.priority || 0, ePr = eMv.priority || 0;
+  const pSpd = monStats(p).spd * stageMult(B.stages.p.spd);
+  const eSpd = monStats(e).spd * stageMult(B.stages.e.spd);
+  const pFirst = (pPr > ePr) || (pPr === ePr && pSpd >= eSpd);
   const seq = pFirst ? ["p","e"] : ["e","p"];
+  const foeMv = eMv;
   let step = 0;
   function next() {
     if (B.over) return;
@@ -1181,7 +1349,7 @@ function playerMove(i) {
       });
     } else {
       if (e.hp <= 0) { next(); return; }
-      doAttack(e, p, enemyMove(), false, () => {
+      doAttack(e, p, foeMv, false, () => {
         if (p.hp <= 0) playerFainted(); else next();
       });
     }
@@ -1342,6 +1510,8 @@ function init() {
   $("btn-buypack").onclick = () => { sfx.tap(); buyPack(); };
   $("b-m1").onclick = () => playerMove(0);
   $("b-m2").onclick = () => playerMove(1);
+  $("b-m3").onclick = () => playerMove(2);
+  $("b-m4").onclick = () => playerMove(3);
   $("b-switch").onclick = () => { sfx.tap(); showSwitchList(false); };
   $("b-run").onclick = runAway;
   $("btn-mute").onclick = toggleMute;
